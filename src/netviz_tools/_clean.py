@@ -609,6 +609,7 @@ def clean(
     zeros: Literal["drop", "keep"] = "drop",
     self_loops: bool = False,
     duplicates: Literal["sum", "keep"] = "sum",
+    labels: Mapping[str, str] | None = None,
 ) -> tuple[FlowFrame, CleaningReport]:
     """Turn a messy edge or trade table into a flow frame, and report every change.
 
@@ -662,6 +663,9 @@ def clean(
         Rows that share (source, target, time, category, unit, reported_by)
         are summed (``"sum"``, default) or kept as separate rows (``"keep"``).
         Rows identical in every raw column are always dropped first.
+    labels
+        Display labels for charts, merged over the ones worked out from the
+        raw table (see Returns).
 
     Returns
     -------
@@ -672,7 +676,11 @@ def clean(
         ``report.dropped``. Names are strings, the time column is ``int64``
         and the weight column ``float64``. Rows are sorted by category, time,
         source, target and unit, with a fresh index. Several units may
-        remain; see ``report.units``.
+        remain; see ``report.units``. ``flows.attrs["labels"]`` holds display
+        labels for charts: the raw column names (so a column called
+        ``"Persons"`` labels the weight axis "Persons"), or for reporter
+        tables with export/import directions "Exporter", "Importer",
+        "Exports" and "Imports".
     report : CleaningReport
         The columns used, per-step row counts, renames, look-alike names,
         mirror statistics and the dropped rows with reasons.
@@ -818,6 +826,7 @@ def clean(
     work["weight"] = work["weight"].astype("float64")
     flows = work[[*_SCHEMA_ROLES, *extra]].rename(columns=_COLUMN)
     validate_flows(flows)
+    flows.attrs["labels"] = _display_labels(mapping, raw, labels)
 
     units: dict[str, dict[str, int]] = {}
     sizes = work.groupby(["category", "unit"], sort=True).size()
@@ -841,6 +850,28 @@ def clean(
 
 # ---------------------------------------------------------------------------
 # Steps
+
+
+def _display_labels(
+    mapping: Mapping[Hashable, str], raw: pd.DataFrame, extra: Mapping[str, str] | None
+) -> dict[str, str]:
+    """Work out chart labels from the raw column names (see ``clean``)."""
+    by_role = {role: str(col) for col, role in mapping.items()}
+    out: dict[str, str] = {}
+    if "direction" in by_role or "reported_by" in by_role:
+        out.update({"source": "Exporter", "target": "Importer", "out": "Exports", "in": "Imports"})
+    if "direction" in by_role:
+        seen = " ".join(map(str, pd.unique(raw[by_role["direction"]].dropna()))).lower()
+        if "quantity" in seen and "value" not in seen:
+            out["weight"] = "Quantity"
+        elif "value" in seen and "quantity" not in seen:
+            out["weight"] = "Value"
+    for role in ("source", "target", "time", "category", "weight"):
+        if role in by_role and role not in out:
+            name = " ".join(by_role[role].replace("_", " ").split())
+            out[role] = name[:1].upper() + name[1:]
+    out.update(extra or {})
+    return out
 
 
 def _check_choice(name: str, value: object, allowed: tuple[object, ...]) -> None:

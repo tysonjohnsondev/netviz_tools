@@ -741,3 +741,32 @@ def test_clean_raw_sample_drops_self_loops_like_load_sample() -> None:
     expected = faostat.load_sample(items="Soya beans", reporter="combined")
     assert len(flows) == len(expected)
     assert step(report, "self-loops").rows_out < step(report, "self-loops").rows_in
+
+
+def test_display_labels_come_from_raw_columns() -> None:
+    raw = pd.DataFrame({"origin_country": ["A", "B"], "Destination": ["B", "C"], "persons": [5, 7]})
+    flows, _ = clean(raw, fill={"time": 2020, "category": "migrants", "unit": "persons"})
+    assert flows.attrs["labels"] == {
+        "source": "Origin country",
+        "target": "Destination",
+        "weight": "Persons",
+    }
+    flows2, _ = clean(
+        raw, fill={"time": 2020, "category": "m", "unit": "p"}, labels={"weight": "People"}
+    )
+    assert flows2.attrs["labels"]["weight"] == "People"
+
+
+def test_display_labels_for_trade_tables() -> None:
+    raw = nv.datasets.faostat.raw_sample(items="Wheat", years=2022)
+    flows, _ = clean(raw)
+    lab = flows.attrs["labels"]
+    assert lab["source"] == "Exporter"
+    assert lab["out"] == "Exports"
+    assert lab["weight"] == "Quantity"
+    assert lab["time"] == "Year"
+    assert lab["category"] == "Item"
+    both = raw.assign(Element=raw["Element"].str.replace("quantity", "value"))
+    both = pd.concat([raw, both], ignore_index=True)
+    lab2 = clean(both, fill=None)[0].attrs["labels"]
+    assert lab2["weight"] == "Value"
