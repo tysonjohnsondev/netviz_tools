@@ -66,10 +66,11 @@ def _select(flows: pd.DataFrame, col: str, wanted: object, note: str = "") -> pd
     for value in values:
         if value in present:
             continue
-        msg = f"no flows with {col}={value!r}{note}"
-        close = suggest(str(value), map(str, available), n=3)
-        if close:
-            msg += ". Did you mean: " + ", ".join(close) + "?"
+        msg = f"no flows with {col}={value!r}{note}."
+        if isinstance(value, str):
+            close = suggest(value, [x for x in available if isinstance(x, str)], n=3)
+            if close:
+                msg += " Did you mean: " + ", ".join(map(repr, close)) + "?"
         shown = ", ".join(map(repr, available[:10])) + (", ..." if len(available) > 10 else "")
         raise ValueError(f"{msg} Available values ({len(available)}): {shown}")
     return flows[flows[col].isin(values)]

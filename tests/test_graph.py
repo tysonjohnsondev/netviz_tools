@@ -64,9 +64,12 @@ def test_category_filter_selects_one_slice() -> None:
 
 
 def test_unknown_filter_values_raise(flows: pd.DataFrame) -> None:
-    with pytest.raises(ValueError, match=r"time=1999.*Available values \(2\): 2020, 2021"):
+    with pytest.raises(ValueError, match=r"time=1999\. Available values \(2\): 2020, 2021$"):
         nv.build_graph(flows, time=1999)
-    with pytest.raises(ValueError, match=r"category='X'.*Did you mean: x\?"):
+    with pytest.raises(
+        ValueError,
+        match=r"category='X' among the selected time values\. Did you mean: 'x'\? Available",
+    ):
         nv.build_graph(flows, time=2020, category="X")
     with pytest.raises(ValueError, match="among the selected time values"):
         nv.build_graph(flows, time=2020, category=["x", "y"])

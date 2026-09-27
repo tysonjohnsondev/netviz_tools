@@ -24,16 +24,12 @@ The store keeps FAOSTAT's own vocabulary, but :func:`load` and
 :func:`load_sample` return the library's generic flow frame
 (:data:`netviz_tools.FLOW_COLUMNS`):
 
-========== ==========================================
-column     FAOSTAT meaning
-========== ==========================================
-source     exporting country
-target     importing country
-time       year
-category   item (commodity)
-weight     quantity, or trade value with ``measure="value"``
-unit       ``t``, ``head``, ``number`` or ``1000 USD``
-========== ==========================================
+* ``source``: the exporting country;
+* ``target``: the importing country;
+* ``time``: the year;
+* ``category``: the FAOSTAT item (commodity);
+* ``weight``: the quantity, or the trade value with ``measure="value"``;
+* ``unit``: ``t``, ``head``, ``number`` or ``1000 USD``.
 
 Every returned frame also carries a copy of :data:`LABELS` in
 ``flows.attrs["labels"]`` (with ``"weight": "Value"`` for trade values).
