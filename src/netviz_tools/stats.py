@@ -33,6 +33,7 @@ from scipy import optimize, special, stats
 from netviz_tools.errors import InsufficientDataError, UnknownMetricError
 
 __all__ = [
+    "Distribution",
     "DistributionComparison",
     "FitQuantity",
     "PowerLawFit",
@@ -46,6 +47,8 @@ FitQuantity: TypeAlias = Literal[
 """Which per-node quantity to fit. Degrees are discrete; strengths continuous."""
 
 Distribution: TypeAlias = Literal["power_law", "lognormal", "exponential"]
+"""A fitted distribution family: the power law, or one of the two alternatives
+it is compared against (lognormal and exponential)."""
 
 FloatArray: TypeAlias = npt.NDArray[np.float64]
 

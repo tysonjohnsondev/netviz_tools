@@ -35,6 +35,7 @@ CentralityKind: TypeAlias = Literal[
 * ``in_strength`` / ``out_strength`` / ``strength``: weighted in, out and
   total degree, in the graph's unit.
 * ``in_degree`` / ``out_degree`` / ``degree``: number of partners.
+* On a directed graph, ``degree`` and ``strength`` count incoming plus outgoing edges.
 * ``pagerank``: weighted PageRank. A node ranks high when large flows arrive
   from nodes that themselves rank high (an important destination).
 * ``reverse_pagerank``: PageRank on the reversed graph. A node ranks high when
