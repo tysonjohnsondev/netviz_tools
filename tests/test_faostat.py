@@ -128,7 +128,8 @@ def test_default_cache_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
     assert faostat.default_cache_dir() == tmp_path / "x"
     assert faostat.store_path() == tmp_path / "x" / "faostat_trade"
     monkeypatch.delenv(faostat.ENV_CACHE_DIR)
-    assert faostat.default_cache_dir().name == "netviz_tools"
+    # platformdirs appends "Cache" on Windows (...\netviz_tools\Cache)
+    assert "netviz_tools" in faostat.default_cache_dir().parts
     assert not (tmp_path / "x").exists()
 
 
