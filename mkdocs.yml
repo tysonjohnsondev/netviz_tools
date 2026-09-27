@@ -1,0 +1,114 @@
+site_name: netviz-tools
+site_description: Typed tools for building, measuring and plotting bilateral flow networks, with FAOSTAT agricultural trade as the flagship dataset.
+site_author: Tyson Johnson
+site_url: https://tysonjohnsondev.github.io/netviz_tools/
+repo_url: https://github.com/tysonjohnsondev/netviz_tools
+repo_name: tysonjohnsondev/netviz_tools
+edit_uri: ""
+copyright: Code MIT licence. FAOSTAT data CC BY 4.0.
+strict: true
+exclude_docs: |
+  hooks/
+hooks:
+  - docs/hooks/sphinx_roles.py
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Gallery:
+      - gallery/index.md
+      - The 2022 wheat shock: gallery/wheat-2022-shock.ipynb
+      - Community structure: gallery/community-structure.ipynb
+      - Power law vs lognormal: gallery/power-law-vs-lognormal.ipynb
+  - Data and licences: data.md
+  - API reference:
+      - api/index.md
+      - netviz_tools: api/package.md
+      - graph: api/graph.md
+      - analysis: api/analysis.md
+      - metrics: api/metrics.md
+      - temporal: api/temporal.md
+      - stats: api/stats.md
+      - plot: api/plot.md
+      - datasets.faostat: api/faostat.md
+      - errors: api/errors.md
+      - schema: api/schema.md
+  - Changelog: changelog.md
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      include: ["*.ipynb"]
+      execute: false
+      include_source: true
+      no_prompt: true
+      cache: false
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            docstring_section_style: table
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
