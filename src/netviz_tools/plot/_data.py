@@ -10,7 +10,7 @@ from typing import Any, TypeAlias
 import networkx as nx
 import pandas as pd
 
-from netviz_tools._nxutil import as_simple
+from netviz_tools._nxutil import as_simple, has_weights
 from netviz_tools.errors import MixedSliceError
 from netviz_tools.plot._style import graph_labels, merge_labels, unit_of
 
@@ -66,7 +66,11 @@ class Frames:
 
     @cached_property
     def union(self) -> nx.Graph[Any]:
-        """All periods combined into one graph with summed edge weights."""
+        """All periods combined into one graph with summed edge weights.
+
+        Edges carry ``weight`` only when at least one period has weights (an
+        edge without one then counts as 1).
+        """
         if not self.animated:
             return self.first
         first = self.first
@@ -74,6 +78,7 @@ class Frames:
         out.graph.update(first.graph)
         out.graph["time"] = list(self.graphs)
         out.graph["aggregate"] = "sum"
+        weighted = any(has_weights(g) for g in self.graphs.values())
         for g in self.graphs.values():
             for n, d in g.nodes(data=True):
                 if n in out:
@@ -81,7 +86,9 @@ class Frames:
                 else:
                     out.add_node(n, **d)
             for u, v, w in g.edges(data="weight", default=1.0):
-                if out.has_edge(u, v):
+                if not weighted:
+                    out.add_edge(u, v)
+                elif out.has_edge(u, v):
                     out[u][v]["weight"] += float(w)
                 else:
                     out.add_edge(u, v, weight=float(w))

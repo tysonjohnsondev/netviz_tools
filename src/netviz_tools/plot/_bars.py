@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
-from typing import Literal, TypeAlias
+from typing import Any, Final, Literal, TypeAlias
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,7 +19,7 @@ from netviz_tools.plot._data import (
     to_frames,
 )
 from netviz_tools.plot._render import resolve_focus
-from netviz_tools.plot._resolve import NodeSpec, node_values, select_top
+from netviz_tools.plot._resolve import NodeSpec, node_series, node_values, select_top
 from netviz_tools.plot._style import (
     DECREASE_COLOR,
     INCREASE_COLOR,
@@ -37,6 +37,15 @@ __all__ = ["Role", "compare", "ranking"]
 Role: TypeAlias = Literal["out", "in", "both"]
 """Which side of a node's flows to show: what it sends (``"out"``), what it
 receives (``"in"``), or both side by side."""
+
+
+_LEGEND_ON_TOP: Final = {
+    "orientation": "h",
+    "x": 0,
+    "xanchor": "left",
+    "y": 1.0,
+    "yanchor": "bottom",
+}
 
 
 def _bar_height(n: int) -> int:
@@ -121,7 +130,7 @@ def ranking(
         raise ValueError("change=True needs at least two periods")
     delta = {n: last[n] - prev[n] for n in last} if prev is not None else {}
     rank_by = {n: abs(d) for n, d in delta.items()} if change else last
-    order = select_top(pd.Series(rank_by, dtype=float), top_n)
+    order = select_top(node_series(rank_by, dtype=float), top_n)
     order += [f for f in focus_nodes if f not in set(order)]
     order = order[::-1]  # plotly draws the first bar at the bottom
     names = [str(n) for n in order]
@@ -203,12 +212,21 @@ def ranking(
     if title is None:
         title = f"{cat}: {default[:1].lower() + default[1:]}" if isinstance(cat, str) else default
     layout = base_layout(
-        title, height or _bar_height(len(order)), margin={"l": 10, "r": 40, "t": 60, "b": 40}
+        title, height or _bar_height(len(order)), margin={"l": 10, "r": 40, "t": 80, "b": 40}
     )
+    xaxis: dict[str, Any] = {
+        "title": {"text": x_title},
+        "zeroline": True,
+        "zerolinecolor": "#bdbcb6",
+    }
+    if change:  # leave room for the percentage labels outside the bars
+        lo, hi = min(0.0, *delta.values()), max(0.0, *delta.values())
+        pad = 0.14 * (hi - lo)
+        xaxis["range"] = [lo - pad if lo < 0 else lo, hi + pad if hi > 0 else hi]
     layout.update(
-        xaxis={"title": {"text": x_title}, "zeroline": True, "zerolinecolor": "#bdbcb6"},
-        yaxis={"automargin": True},
-        legend={"orientation": "h", "y": -0.12, "x": 0},
+        xaxis=xaxis,
+        yaxis={"automargin": True, "ticksuffix": " "},
+        legend=_LEGEND_ON_TOP,
         bargap=0.3,
     )
     fig.update_layout(**layout)
@@ -313,8 +331,11 @@ def compare(
     )
     order = select_top(size, top_n)[::-1]
     names = [str(c) for c in order]
-    fig = go.Figure()
-    for side, color in zip(sides, (PALETTE[0], PALETTE[1]), strict=False):
+    colors = {"out": PALETTE[0], "in": PALETTE[1]}
+    bars, ticks = [], []
+    # Horizontal groups stack their traces bottom-up: add "in" first so that
+    # "out" sits on top, and reverse the legend so it still reads out, in.
+    for side in reversed(sides):
         name = lab[side]
         values = [cur[side].get(c, 0.0) for c in order]
         hover = []
@@ -325,23 +346,24 @@ def compare(
                 change = fmt_pct((v - p) / p) if p > 0 else "new"
                 text += f"<br>{name}, {prev_p}: {fmt(p, unit)}<br>change: {change}"
             hover.append(text)
-        fig.add_trace(
+        bars.append(
             go.Bar(
                 x=values,
                 y=names,
                 orientation="h",
                 name=name,
-                marker={"color": color},
+                marker={"color": colors[side]},
                 hovertext=hover,
                 hoverinfo="text",
                 offsetgroup=side,
             )
         )
         if before is not None:
-            fig.add_trace(
+            ticks.append(
                 go.Scatter(
                     x=[before[side].get(c, 0.0) for c in order],
                     y=names,
+                    orientation="h",
                     mode="markers",
                     marker={
                         "symbol": "line-ns",
@@ -355,6 +377,7 @@ def compare(
                     offsetgroup=side,
                 )
             )
+    fig = go.Figure([*ticks, *bars])
     if title is None:
         what = " and ".join(lower_label(lab[s]) for s in sides)
         title = f"{focus}: {what} by {lower_label(lab['category'])}" + (
@@ -363,14 +386,14 @@ def compare(
     layout = base_layout(
         title,
         height or _bar_height(len(order) * len(sides)),
-        margin={"l": 10, "r": 20, "t": 60, "b": 40},
+        margin={"l": 10, "r": 20, "t": 80, "b": 40},
     )
     layout.update(
         barmode="group",
         scattermode="group",
         xaxis={"title": {"text": lab["weight"] + (f" ({unit})" if unit else "")}},
-        yaxis={"automargin": True},
-        legend={"orientation": "h", "y": -0.12, "x": 0},
+        yaxis={"automargin": True, "ticksuffix": " "},
+        legend={**_LEGEND_ON_TOP, "traceorder": "reversed"},
         bargap=0.25,
     )
     fig.update_layout(**layout)

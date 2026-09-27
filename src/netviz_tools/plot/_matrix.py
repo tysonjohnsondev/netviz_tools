@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
-from typing import Any
+from typing import Any, Final
 
 import networkx as nx
 import numpy as np
@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 
 from netviz_tools.plot._data import PlotData, Selector, to_frames
 from netviz_tools.plot._render import resolve_focus
-from netviz_tools.plot._resolve import NodeSpec, auto_size, node_values, select_top
+from netviz_tools.plot._resolve import NodeSpec, auto_size, node_index, node_values, select_top
 from netviz_tools.plot._style import (
     EN_DASH,
     SEQUENTIAL,
@@ -25,6 +25,8 @@ from netviz_tools.plot._style import (
 )
 
 __all__ = ["adjacency"]
+
+_MAX_TICK_CHARS: Final = 20
 
 
 def adjacency(
@@ -84,7 +86,7 @@ def adjacency(
     assert size is not None
     nodes = select_top(size.series, top_n)
     nodes += [f for f in focus_nodes if f not in set(nodes)]
-    sizes = size.series.reindex(nodes).astype(float)
+    sizes = size.series.reindex(node_index(nodes)).astype(float)
     order, groups = resolve_order(g, nodes, sizes, sort_by, lab, partition, seed)
     idx = {n: i for i, n in enumerate(order)}
     mat = np.full((len(order), len(order)), np.nan)
@@ -96,7 +98,8 @@ def adjacency(
     finite = mat[np.isfinite(mat)]
     log = wants_log(finite)
     z = np.log10(1.0 + mat) if log else mat
-    names = [f"<b>{n}</b>" if n in focus_nodes else str(n) for n in order]
+    names = [str(n) for n in order]
+    ticks = [_tick_text(n, bold=n in focus_nodes) for n in order]
     unit = frames.unit
     if directed:
         row_title, col_title = lab["source"], lab["target"]
@@ -149,30 +152,34 @@ def adjacency(
         shapes.append({**style, "x0": b - 0.5, "x1": b - 0.5, "y0": -0.5, "y1": edge})
         shapes.append({**style, "y0": b - 0.5, "y1": b - 0.5, "x0": -0.5, "x1": edge})
     layout = base_layout(title or default_title(g, "adjacency matrix"), height)
-    tick_font = {"size": 9 if len(order) > 40 else 11}
+    layout["title"].update(y=0.98, yanchor="top")
+    tick_font = {"size": 9 if len(order) > 40 else (10 if len(order) > 25 else 11)}
+    axis = {
+        "type": "category",
+        "tickmode": "array",
+        "tickvals": names,
+        "ticktext": ticks,
+        "tickfont": tick_font,
+        "showgrid": False,
+        "automargin": True,
+    }
     layout.update(
         shapes=shapes,
-        xaxis={
-            "title": {"text": col_title},
-            "type": "category",
-            "side": "top",
-            "tickangle": -60,
-            "tickfont": tick_font,
-            "showgrid": False,
-        },
-        yaxis={
-            "title": {"text": row_title},
-            "type": "category",
-            "autorange": "reversed",
-            "tickfont": tick_font,
-            "showgrid": False,
-            "scaleanchor": "x",
-        },
-        margin={"l": 10, "r": 10, "t": 140, "b": 10},
+        xaxis={**axis, "title": {"text": col_title}, "side": "top", "tickangle": -60},
+        yaxis={**axis, "title": {"text": row_title}, "autorange": "reversed", "scaleanchor": "x"},
+        margin={"l": 10, "r": 10, "t": 150, "b": 10},
         plot_bgcolor="#ffffff",
     )
     fig.update_layout(**layout)
     return fig
+
+
+def _tick_text(node: Hashable, *, bold: bool) -> str:
+    """Axis label: long names are shortened (the hover keeps them whole)."""
+    text = str(node)
+    if len(text) > _MAX_TICK_CHARS:
+        text = text[: _MAX_TICK_CHARS - 1].rstrip() + "\u2026"
+    return f"<b>{text}</b>" if bold else text
 
 
 def resolve_order(
@@ -193,13 +200,13 @@ def resolve_order(
         return nodes, []
     resolved = node_values(g, sort_by, arg="sort_by", labels=lab, partition=partition, seed=seed)
     assert resolved is not None  # sort_by is not None
-    vals = resolved.series.reindex(nodes)
+    vals = resolved.series.reindex(node_index(nodes))
     if not resolved.categorical:
         return select_top(vals.astype(float), None), []
     frame = pd.DataFrame(
         {
             "k": ["" if pd.isna(v) else str(v) for v in vals],
-            "s": sizes.reindex(nodes).fillna(0.0).to_numpy(),
+            "s": sizes.reindex(node_index(nodes)).fillna(0.0).to_numpy(),
             "n": [str(n) for n in nodes],
         },
         index=range(len(nodes)),

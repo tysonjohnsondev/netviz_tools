@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
+from typing import Final
 
 import pandas as pd
 import plotly.graph_objects as go
 
 from netviz_tools.plot._data import PlotData, Selector, to_frames
 from netviz_tools.plot._render import resolve_focus
-from netviz_tools.plot._resolve import NodeSpec, categories, node_values
+from netviz_tools.plot._resolve import NodeSpec, categories, node_index, node_values
 from netviz_tools.plot._style import OTHER_COLOR, base_layout, default_title, fmt, rgba
 
 __all__ = ["sankey"]
@@ -18,6 +19,39 @@ __all__ = ["sankey"]
 def plural(word: str) -> str:
     """Return a naive English plural for column headings."""
     return word if word.endswith("s") else word + "s"
+
+
+_PAD: Final = 12
+_MARGIN_T: Final = 80
+_MARGIN_B: Final = 10
+_MAX_PLACED: Final = 30
+
+
+def _placement(left: list[float], right: list[float], plot_height: int) -> dict[str, list[float]]:
+    """Node ``x``/``y`` that stack each column largest first, from the top.
+
+    Plotly scales node heights so that the fuller column, with its gaps,
+    fills the plot; both columns hold the same total here. ``y`` is the node
+    centre. With many nodes Plotly's own arrangement is used instead.
+    """
+    if max(len(left), len(right)) > _MAX_PLACED or plot_height <= 0:
+        return {}
+    gap = _PAD / plot_height
+    usable = 1.0 - gap * (max(len(left), len(right)) - 1)
+    total = sum(left) or 1.0
+
+    def column(values: list[float]) -> list[float]:
+        ys, top = [], 0.0
+        for v in values:
+            h = v / total * usable
+            ys.append(top + h / 2)
+            top += h + gap
+        return ys
+
+    return {
+        "x": [0.001] * len(left) + [0.999] * len(right),
+        "y": column(left) + column(right),
+    }
 
 
 def sankey(
@@ -104,7 +138,7 @@ def sankey(
         if not resolved.categorical:
             raise ValueError("sankey colours need a categorical color_by (text or community)")
         real = list(dict.fromkeys([*sources, *targets]))
-        cats = categories(resolved.series.reindex(real), name=resolved.name)
+        cats = categories(resolved.series.reindex(node_index(real)), name=resolved.name)
         colors = {n: cats.colors[str(cats.labels[n])] for n in real}
         legend = cats.colors
 
@@ -112,6 +146,13 @@ def sankey(
         return colors.get(n, OTHER_COLOR if resolved is not None else "#2a78d6")
 
     unit = frames.unit
+    left_totals = out_s.iloc[: len(sources)].tolist()
+    right_totals = in_s.iloc[: len(targets)].tolist()
+    if len(left) > len(sources):
+        left_totals.append(float(out_s.iloc[top_n:].sum()))
+    if len(right) > len(targets):
+        right_totals.append(float(in_s.iloc[top_n:].sum()))
+    placement = _placement(left_totals, right_totals, height - _MARGIN_T - _MARGIN_B)
     src, dst, values = links["src"].tolist(), links["dst"].tolist(), links["w"].tolist()
     fig = go.Figure(
         go.Sankey(
@@ -121,12 +162,10 @@ def sankey(
             node={
                 "label": [str(n) for n in left] + [str(n) for n in right],
                 "color": [node_color(n) for n in left] + [node_color(n) for n in right],
-                "pad": 12,
+                "pad": _PAD,
                 "thickness": 16,
                 "line": {"width": 0},
-                "x": [0.001] * len(left) + [0.999] * len(right),
-                "y": [(i + 0.5) / len(left) for i in range(len(left))]
-                + [(i + 0.5) / len(right) for i in range(len(right))],
+                **placement,
             },
             link={
                 "source": [left_idx[s] for s in src],
@@ -166,7 +205,7 @@ def sankey(
             "showarrow": False,
         },
     ]
-    layout["margin"] = {"l": 10, "r": 10, "t": 80, "b": 10}
+    layout["margin"] = {"l": 10, "r": 10, "t": _MARGIN_T, "b": _MARGIN_B}
     layout["font"] = {**layout["font"], "size": 11}
     fig.update_layout(**layout)
     if legend:

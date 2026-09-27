@@ -22,7 +22,19 @@ def spec(fig: go.Figure) -> dict[str, Any]:
 
 
 def node_traces(fig: go.Figure) -> list[dict[str, Any]]:
-    return [t for t in spec(fig)["data"] if str(t.get("legendgroup", "")).startswith("node")]
+    """Traces of node markers (not the legend-only entries drawn when there is a focus)."""
+    return [
+        t
+        for t in spec(fig)["data"]
+        if str(t.get("legendgroup", "")).startswith("node")
+        and (t.get("x") or t.get("lon") or [0]) != [None]
+    ]
+
+
+def labels_shown(fig: go.Figure) -> list[str]:
+    """Non-empty node labels (they live in their own trace, drawn above the markers)."""
+    trace = next(t for t in spec(fig)["data"] if t.get("name") == "labels")
+    return [x for x in trace.get("text") or [] if x]
 
 
 def edge_hover(fig: go.Figure) -> dict[str, Any]:
@@ -41,7 +53,11 @@ def karate() -> nx.Graph[Any]:
 
 def node_xs(s: dict[str, Any]) -> list[float]:
     return [
-        x for t in s["data"] if str(t.get("legendgroup", "")).startswith("node") for x in t["x"]
+        x
+        for t in s["data"]
+        if str(t.get("legendgroup", "")).startswith("node")
+        for x in t["x"]
+        if x is not None  # legend-only entries have no points
     ]
 
 
@@ -54,7 +70,7 @@ def test_karate_categorical_attribute(karate: nx.Graph[Any]) -> None:
     assert spec(fig)["layout"]["legend"]["title"]["text"] == "Club"
     assert spec(fig)["layout"]["title"]["text"] == "Zachary's Karate Club: network"
     # 34 nodes is above the "label everything" threshold of 30: the 12 largest are labelled
-    assert sum(1 for t in traces for txt in t["text"] if txt) == 12
+    assert len(labels_shown(fig)) == 12
     hover = traces[0]["hovertext"][0]
     assert "Club: Mr. Hi" in hover
     assert "Total weight" in hover
@@ -219,7 +235,7 @@ def test_top_n_focus_labels_and_quantile() -> None:
     g = nx.les_miserables_graph()
     fig = nv.plot.network(g, top_n=10, focus="Gervais", show_labels=3, min_weight_quantile=0.5)
     assert n_nodes(fig) == 11
-    labelled = [x for t in node_traces(fig) for x in t["text"] if x]
+    labelled = labels_shown(fig)
     assert "Gervais" in labelled
     assert len(labelled) == 4
     widths = [
@@ -230,12 +246,12 @@ def test_top_n_focus_labels_and_quantile() -> None:
     ]
     assert widths == [2.5]
     fig2 = nv.plot.network(g, show_labels=["Valjean"], label_by=None)
-    assert [x for t in node_traces(fig2) for x in t["text"] if x] == ["Valjean"]
+    assert labels_shown(fig2) == ["Valjean"]
     fig3 = nv.plot.network(g, show_labels=False)
-    assert not [x for t in node_traces(fig3) for x in t["text"] if x]
+    assert not labels_shown(fig3)
     nx.set_node_attributes(g, {n: n.upper() for n in g}, "caps")
     fig4 = nv.plot.network(g, show_labels=True, label_by="caps", top_n=5)
-    assert "VALJEAN" in [x for t in node_traces(fig4) for x in t["text"]]
+    assert "VALJEAN" in labels_shown(fig4)
 
 
 def test_pos_passthrough() -> None:
@@ -311,7 +327,7 @@ def test_adjacency(karate: nx.Graph[Any]) -> None:
     assert all(z[i][j] == z[j][i] for i in range(34) for j in range(34))
     by_degree = spec(nv.plot.adjacency(karate, sort_by="degree", top_n=10, focus=16))
     assert len(by_degree["data"][0]["z"]) == 11
-    assert "<b>16</b>" in by_degree["data"][0]["x"]
+    assert "<b>16</b>" in by_degree["layout"]["xaxis"]["ticktext"]
     assert not by_degree["layout"].get("shapes")
     plain = spec(nv.plot.adjacency(karate, sort_by=None, top_n=5))
     assert len(plain["data"][0]["x"]) == 5
@@ -428,3 +444,86 @@ def test_plots_never_show(monkeypatch: pytest.MonkeyPatch, karate: nx.Graph[Any]
     for kind in ("network", "adjacency", "ranking"):
         nv.plot.auto(karate, kind=kind)
     nv.plot.ego(karate, 0)
+
+
+def test_mapping_of_unweighted_graphs() -> None:
+    g1: nx.DiGraph[Any] = nx.DiGraph([(1, 2), (2, 3)])
+    g2: nx.DiGraph[Any] = nx.DiGraph([(1, 2), (3, 4)])
+    fig = nv.plot.network({2020: g1, 2021: g2})
+    assert spec(fig)["layout"]["annotations"][0]["text"].startswith("Node size: Degree (in + out)")
+    weighted: nx.DiGraph[Any] = nx.DiGraph()
+    weighted.add_edge(1, 2, weight=3.0)
+    mixed = nv.plot.network({2020: g1, 2021: weighted})
+    assert "edge width: weight" in spec(mixed)["layout"]["annotations"][0]["text"]
+    with pytest.raises(UnknownMetricError, match="not an edge attribute"):
+        nv.plot.network({2020: g1, 2021: g2}, edge_width_by="weight")
+
+
+def test_tuple_nodes() -> None:
+    grid = nx.grid_2d_graph(4, 4)
+    fig = nv.plot.network(grid, color_by="pagerank")
+    assert n_nodes(fig) == 16
+    assert "(0, 0)" in " ".join(labels_shown(fig))
+    assert n_nodes(nv.plot.network(grid, color_by={(0, 0): "corner"}, layout="community")) == 16
+    assert len(spec(nv.plot.adjacency(grid, top_n=None))["data"][0]["z"]) == 16
+    assert spec(nv.plot.ranking(grid, top_n=3))["data"][0]["y"][-1].startswith("(")
+    assert n_nodes(nv.plot.ego(grid, (0, 0))) == 3
+
+
+@pytest.mark.parametrize("layout", ["spectral", "kamada_kawai"])
+def test_disconnected_layouts_do_not_collapse(layout: nv.plot.Layout) -> None:
+    parts = [nx.cycle_graph(8), nx.path_graph(5), nx.star_graph(4), nx.empty_graph(3)]
+    g = nx.disjoint_union_all(parts)
+    xs = node_xs(spec(nv.plot.network(g, layout=layout, color_by=None, size_by=None)))
+    ys = [
+        y
+        for t in spec(nv.plot.network(g, layout=layout, color_by=None, size_by=None))["data"]
+        if t.get("legendgroup") == "nodes"
+        for y in t["y"]
+    ]
+    points = {(round(x, 3), round(y, 3)) for x, y in zip(xs, ys, strict=True)}
+    assert len(points) == g.number_of_nodes()
+
+
+def test_layout_options_override_defaults() -> None:
+    g = nx.les_miserables_graph()
+    a = node_xs(spec(nv.plot.network(g, layout_options={"weight": "weight"})))
+    b = node_xs(spec(nv.plot.network(g)))
+    assert a != b
+    c = node_xs(spec(nv.plot.network(g, layout_options={"seed": 7})))
+    assert c != b
+
+
+def test_layout_uses_drawn_edges() -> None:
+    from netviz_tools.plot._network import _layout_graph
+
+    g: nx.Graph[Any] = nx.Graph()
+    g.add_weighted_edges_from([("a", "b", 1.0), ("b", "c", 10.0), ("c", "d", 20.0), ("d", "a", 2)])
+    kept = _layout_graph(g, "weight", 0.5)
+    assert set(kept) == set(g)
+    assert sorted(kept.edges) == [("b", "c"), ("c", "d")]
+    assert _layout_graph(g, "weight", None) is g  # sparse: every edge
+    assert _layout_graph(g, None, 0.5) is g
+    dense = nx.complete_graph(9)
+    nx.set_edge_attributes(dense, {(u, v): float(u * v) for u, v in dense.edges}, "weight")
+    backbone = _layout_graph(dense, "weight", None)
+    assert backbone.number_of_nodes() == 9
+    assert backbone.number_of_edges() < dense.number_of_edges()
+    assert all(backbone.degree(n) >= 3 for n in backbone)
+
+
+def test_animation_hides_absent_labels_and_keeps_legend() -> None:
+    g1: nx.DiGraph[Any] = nx.DiGraph([("a", "b"), ("b", "c")])
+    g2: nx.DiGraph[Any] = nx.DiGraph([("a", "b"), ("x", "y")])
+    for g in (g1, g2):
+        nx.set_node_attributes(g, {n: "late" if n in "xy" else "early" for n in g}, "kind")
+    fig = nv.plot.network({2020: g1, 2021: g2}, color_by="kind", show_labels=True)
+    first = {t.name: t for t in fig.frames[0].data}
+    labels = dict(zip(first["labels"].x, first["labels"].text, strict=True))
+    assert sorted(t for t in labels.values() if t) == ["a", "b", "c"]  # x and y are absent
+    legend = [t for t in fig.frames[0].data if t.showlegend is not False and t.mode == "markers"]
+    assert sorted(t.name for t in legend if t.x == (None,)) == ["early", "late"]
+    s = spec(fig)
+    button, slider = s["layout"]["updatemenus"][0], s["layout"]["sliders"][0]
+    assert button["xanchor"] == "right"
+    assert button["x"] <= slider["x"]  # buttons end where the slider starts

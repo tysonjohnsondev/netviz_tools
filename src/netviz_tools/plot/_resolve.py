@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Hashable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Real
 from typing import Any, Final, Literal, TypeAlias, cast, get_args
@@ -54,6 +54,17 @@ a mapping from ``(u, v)`` to value, or ``None``."""
 
 METRICS: Final = get_args(NodeMetric)
 _WEIGHT_METRICS: Final = {"strength", "in_strength", "out_strength"}
+
+
+def node_index(nodes: Iterable[Hashable]) -> pd.Index:
+    """Return an index of nodes; tuple nodes (such as grid coordinates) stay whole."""
+    return pd.Index(list(nodes), tupleize_cols=False)
+
+
+def node_series(values: Mapping[Any, Any], dtype: Any = None) -> pd.Series:
+    """Return a Series from a node mapping without turning tuple nodes into a MultiIndex."""
+    series: pd.Series = pd.Series(list(values.values()), index=node_index(values), dtype=dtype)
+    return series
 
 
 @dataclass(frozen=True, eq=False)
@@ -123,7 +134,7 @@ def compute_metric(
     g: nx.Graph[Any], name: str, *, partition: pd.Series | None = None, seed: int = 0
 ) -> pd.Series:
     """Compute one :data:`NodeMetric` for every node of ``g``."""
-    nodes = list(g.nodes)
+    nodes = node_index(g.nodes)
     if name == "community":
         if partition is not None:
             part = partition.reindex(nodes)
@@ -162,7 +173,7 @@ def node_values(
                 return None
             spec = chosen
         if any(spec in d for _, d in g.nodes(data=True)):
-            values = pd.Series([g.nodes[n].get(spec) for n in nodes], index=nodes, dtype=object)
+            values = node_series({n: g.nodes[n].get(spec) for n in nodes}, dtype=object)
             numeric = is_numeric(values)
             if numeric:
                 values = values.astype(float)
@@ -183,8 +194,8 @@ def node_values(
             f"{arg}={spec!r} is neither a node attribute nor a metric. "
             f"Node attributes: {attrs or 'none'}; metrics: {list(METRICS)}"
         )
-    series = spec if isinstance(spec, pd.Series) else pd.Series(dict(spec), dtype=object)
-    values = series.reindex(nodes)
+    series = spec if isinstance(spec, pd.Series) else node_series(dict(spec), dtype=object)
+    values = series.reindex(node_index(nodes))
     numeric = is_numeric(values)
     if numeric:
         values = values.astype(float)
@@ -234,13 +245,18 @@ def edge_values(
     *,
     arg: str,
     directed: bool,
+    strict: bool = True,
 ) -> pd.Series | None:
-    """Resolve an edge spec to one value per edge (positional index)."""
+    """Resolve an edge spec to one value per edge (positional index).
+
+    With ``strict``, an attribute name that no edge carries raises
+    :class:`UnknownMetricError`; otherwise those edges get ``None``.
+    """
     if spec is None:
         return None
     if isinstance(spec, str):
         vals = [d.get(spec) for *_, d in edges]
-        if edges and all(v is None for v in vals):
+        if strict and edges and all(v is None for v in vals):
             present = sorted({k for *_, d in edges for k in d})
             raise UnknownMetricError(
                 f"{arg}={spec!r} is not an edge attribute. Edge attributes: {present or 'none'}"

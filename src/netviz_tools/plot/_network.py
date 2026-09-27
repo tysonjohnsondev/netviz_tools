@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import math
 import warnings
-from collections.abc import Hashable, Iterable, Mapping
-from typing import Any, Literal, TypeAlias
+from collections.abc import Callable, Hashable, Iterable, Mapping
+from typing import Any, Final, Literal, TypeAlias
 
 import networkx as nx
 import numpy as np
@@ -15,11 +15,20 @@ import plotly.graph_objects as go
 from netviz_tools._nxutil import has_weights
 from netviz_tools.plot._data import Frames, PlotData, Selector, to_frames
 from netviz_tools.plot._geo import coordinates, geo_layout, positions
-from netviz_tools.plot._render import ShowLabels, figure, prepare, resolve_focus
+from netviz_tools.plot._render import (
+    ShowLabels,
+    figure,
+    node_size_range,
+    prepare,
+    resolve_focus,
+)
 from netviz_tools.plot._resolve import (
     EdgeSpec,
     NodeSpec,
     compute_metric,
+    edge_values,
+    node_index,
+    node_series,
     node_values,
     select_top,
 )
@@ -39,12 +48,16 @@ Layout: TypeAlias = Literal[
 ]
 """Node placement for :func:`network`.
 
-* ``"spring"``: Fruchterman-Reingold force layout, seeded (default).
+* ``"spring"``: Fruchterman-Reingold force layout, seeded (default). Above
+  500 nodes it runs fewer iterations (20 at 1,250 nodes and more) to stay
+  fast; pass ``layout_options={"iterations": 50}`` for the full run.
 * ``"kamada_kawai"``: path-length preserving layout; slow above about 500 nodes.
 * ``"circular"``: nodes on a circle, largest first.
 * ``"shell"``: concentric circles, one per colour category when ``color_by``
   is categorical.
 * ``"spectral"``: eigenvectors of the graph Laplacian; fast on large graphs.
+  Like ``"kamada_kawai"``, it lays out each connected component separately
+  and packs them side by side.
 * ``"community"``: each community in its own cluster (see :func:`community_layout`).
 * ``"bipartite"``: two columns, from the ``bipartite`` node attribute (0/1) or
   a two-colouring of the graph.
@@ -59,9 +72,11 @@ def community_layout(
 ) -> dict[Hashable, tuple[float, float]]:
     """Place each community in its own cluster.
 
-    Community centres are laid out with Kamada-Kawai on a ring of the
-    communities, then each community is laid out around its centre, with a
-    radius that grows with the square root of its size.
+    Community centres sit on a circle, then each community is laid out around
+    its centre (Kamada-Kawai when it is connected and has at most 150 nodes,
+    otherwise a spring layout) with a radius that grows with the square root
+    of its size. The circle is widened when needed so that neighbouring
+    communities do not overlap.
 
     Parameters
     ----------
@@ -73,7 +88,7 @@ def community_layout(
     seed
         Seed for the within-community spring layouts.
     spread
-        Distance scale between community centres.
+        Smallest radius of the circle of community centres.
 
     Returns
     -------
@@ -84,14 +99,60 @@ def community_layout(
     for node, cid in partition.items():
         if node in g:
             groups.setdefault(int(cid), []).append(node)
-    ring = nx.cycle_graph(len(groups)) if len(groups) > 2 else nx.path_graph(len(groups))
-    centres = nx.kamada_kawai_layout(ring, scale=spread) if len(groups) > 1 else {0: np.zeros(2)}
+    ordered = [members for _, members in sorted(groups.items())]
+    radii = [0.5 * math.sqrt(len(members)) for members in ordered]
+    k = len(ordered)
+    ring = spread
+    if k > 1:
+        # adjacent centres are 2 R sin(pi / k) apart; leave a 20% gap between clusters
+        widest = max(radii[i] + radii[(i + 1) % k] for i in range(k))
+        ring = max(spread, 1.2 * widest / (2 * math.sin(math.pi / k)))
+    und = g.to_undirected(as_view=True) if g.is_directed() else g
     pos: dict[Hashable, tuple[float, float]] = {}
-    for (_, members), centre in zip(sorted(groups.items()), centres.values(), strict=True):
-        sub = g.subgraph(members)
-        radius = 0.35 * math.sqrt(len(members))
-        inner = nx.spring_layout(sub, seed=seed, center=centre, scale=radius, weight=None)
+    for i, (members, radius) in enumerate(zip(ordered, radii, strict=True)):
+        angle = 2 * math.pi * i / k
+        centre = np.array([ring * math.cos(angle), ring * math.sin(angle)]) if k > 1 else None
+        sub = und.subgraph(members)
+        if len(members) == 1:
+            inner = {members[0]: np.zeros(2) if centre is None else centre}
+        elif len(members) <= 150 and nx.is_connected(sub):
+            inner = nx.kamada_kawai_layout(sub, center=centre, scale=radius, weight=None)
+        else:
+            inner = nx.spring_layout(sub, seed=seed, center=centre, scale=radius, weight=None)
         pos.update({n: (float(x), float(y)) for n, (x, y) in inner.items()})
+    return pos
+
+
+def _pack_components(
+    und: nx.Graph[Any], place: Callable[[nx.Graph[Any]], Mapping[Hashable, Any]]
+) -> dict[Hashable, tuple[float, float]]:
+    """Lay out each connected component with ``place`` and pack them in rows.
+
+    Spectral and Kamada-Kawai layouts are meant for connected graphs: on
+    several components they put all but one on top of each other. Each
+    component gets a box whose side grows with the square root of its size,
+    largest first; isolated nodes fill the last rows.
+    """
+    comps = sorted(nx.connected_components(und), key=lambda c: (-len(c), min(map(str, c))))
+    largest = len(comps[0])
+    boxes: list[tuple[float, dict[Hashable, tuple[float, float]]]] = []
+    for comp in comps:
+        side = 2.0 * math.sqrt(len(comp) / largest)
+        if len(comp) <= 2:
+            local = {n: (0.5 * i - 0.25 * (len(comp) - 1), 0.0) for i, n in enumerate(comp)}
+        else:
+            local = _normalize(place(und.subgraph(comp)))
+        boxes.append((side, {n: (x * side / 2, y * side / 2) for n, (x, y) in local.items()}))
+    width = max(2.0, math.sqrt(sum((side + 0.5) ** 2 for side, _ in boxes)) * 1.2)
+    pos: dict[Hashable, tuple[float, float]] = {}
+    x = y = row = 0.0
+    for side, local in boxes:
+        cell = side + 0.5
+        if x > 0 and x + cell > width:
+            x, y, row = 0.0, y - row, 0.0
+        cx, cy = x + cell / 2, y - cell / 2
+        pos.update({n: (cx + px, cy + py) for n, (px, py) in local.items()})
+        x, row = x + cell, max(row, cell)
     return pos
 
 
@@ -132,9 +193,15 @@ def compute_layout(
     n = g.number_of_nodes()
     if n == 0:
         return {}
+    # Force-directed and spectral layouts treat edges as undirected.
+    und = g.to_undirected(as_view=True) if g.is_directed() else g
     raw: Mapping[Hashable, Any]
+    connected = nx.is_connected(und)
     if layout == "spring":
-        raw = nx.spring_layout(g, seed=seed, weight=None, **opts)
+        iterations = 50 if n <= 500 else max(20, round(25_000 / n))
+        raw = nx.spring_layout(
+            und, **{"seed": seed, "weight": None, "iterations": iterations, **opts}
+        )
     elif layout == "kamada_kawai":
         if n > 500:
             warnings.warn(
@@ -142,7 +209,11 @@ def compute_layout(
                 UserWarning,
                 stacklevel=3,
             )
-        raw = nx.kamada_kawai_layout(g, weight=None, **opts)
+        kk_opts = {"weight": None, **opts}
+        if connected:
+            raw = nx.kamada_kawai_layout(und, **kk_opts)
+        else:
+            raw = _pack_components(und, lambda c: nx.kamada_kawai_layout(c, **kk_opts))
     elif layout == "circular":
         h: nx.Graph[Any] = nx.Graph()
         h.add_nodes_from(order)
@@ -153,12 +224,18 @@ def compute_layout(
             nlist = [list(idx) for _, idx in groups.groupby(groups, sort=False).groups.items()]
         raw = nx.shell_layout(g, nlist=nlist, **opts)
     elif layout == "spectral":
-        raw = nx.spectral_layout(g, weight=None, **opts) if n > 2 else nx.circular_layout(g)
+        sp_opts = {"weight": None, **opts}
+        if connected and n > 2:
+            raw = nx.spectral_layout(und, **sp_opts)
+        elif connected:
+            raw = nx.circular_layout(g)
+        else:
+            raw = _pack_components(und, lambda c: nx.spectral_layout(c, **sp_opts))
     elif layout == "community":
         part = partition if partition is not None else compute_metric(g, "community", seed=0)
         raw = community_layout(g, part, seed=seed, **opts)
     elif layout == "bipartite":
-        raw = nx.bipartite_layout(g, _bipartite_top(g), **opts)
+        raw = nx.bipartite_layout(g, _bipartite_top(und), **opts)
     elif layout == "multipartite":
         key = opts.pop("subset_key", "subset")
         missing = [v for v in g if key not in g.nodes[v]]
@@ -183,7 +260,7 @@ def _choose_nodes(
     if size_values is not None and pd.api.types.is_numeric_dtype(size_values):
         rank = size_values
     else:
-        rank = pd.Series(dict(u.degree()), dtype=float).reindex(list(u.nodes))
+        rank = node_series(dict(u.degree()), dtype=float)
     limit = top_n
     if limit is None and max_nodes is not None and u.number_of_nodes() > max_nodes:
         warnings.warn(
@@ -196,6 +273,49 @@ def _choose_nodes(
     nodes = select_top(rank, limit)
     nodes += [f for f in focus if f not in set(nodes)]
     return nodes
+
+
+_BACKBONE_EDGES_PER_NODE: Final = 3
+"""A graph with more than this many edges per node is laid out on its backbone."""
+
+
+def _layout_graph(
+    g: nx.Graph[Any], edge_width_by: EdgeSpec, quantile: float | None
+) -> nx.Graph[Any]:
+    """Return the graph whose edges should drive a force-directed layout.
+
+    With ``min_weight_quantile``, only the edges left visible, so nodes are
+    placed by the edges the reader sees. Otherwise a dense weighted graph
+    (more than three edges per node, typical of trade data) keeps each node's
+    three heaviest edges: laid out on every edge, it packs into one tight
+    ball with a few far outliers.
+    """
+    if edge_width_by is None:
+        return g
+    edges = list(g.edges(data=True))
+    w = edge_values(edges, edge_width_by, arg="edge_width_by", directed=g.is_directed())
+    assert w is not None  # edge_width_by is not None
+    values = pd.to_numeric(w, errors="coerce").to_numpy(dtype=float)
+    if not np.isfinite(values).any():
+        return g
+    if quantile is not None:
+        keep = values >= np.nanquantile(values, quantile)
+    elif len(edges) > _BACKBONE_EDGES_PER_NODE * g.number_of_nodes():
+        keep = np.zeros(len(edges), dtype=bool)
+        by_node: dict[Hashable, list[int]] = {}
+        for i, (u, v, _) in enumerate(edges):
+            by_node.setdefault(u, []).append(i)
+            by_node.setdefault(v, []).append(i)
+        ranked = np.nan_to_num(values, nan=-np.inf)
+        for idx in by_node.values():
+            top = sorted(idx, key=lambda i: -ranked[i])[:_BACKBONE_EDGES_PER_NODE]
+            keep[top] = True
+    else:
+        return g
+    h: nx.Graph[Any] = g.__class__()
+    h.add_nodes_from(g.nodes(data=True))
+    h.add_edges_from(e for e, k in zip(edges, keep, strict=True) if k)
+    return h
 
 
 def _draw_network(
@@ -249,12 +369,12 @@ def _draw_network(
     else:
         groups = None
         if color is not None and color.categorical:
-            groups = color.series.reindex(nodes).astype(str)
+            groups = color.series.reindex(node_index(nodes)).astype(str)
         part = partition
         if part is None and color is not None and color.name == "community":
             part = color.series
         placed = compute_layout(
-            sub,
+            _layout_graph(sub, edge_width_by, min_weight_quantile),
             layout,
             order=nodes,
             seed=seed,
@@ -274,7 +394,7 @@ def _draw_network(
         label_by=label_by,
         show_labels=show_labels,
         focus=focus_nodes,
-        size_range=(6.0, 26.0) if geo else (8.0, 40.0),
+        size_range=(6.0, 26.0) if geo else node_size_range(len(nodes)),
         min_weight_quantile=min_weight_quantile,
     )
     fig = figure(scene, title=title, height=height, what=what)
@@ -406,7 +526,7 @@ def network(
     >>> import networkx as nx
     >>> import netviz_tools as nv
     >>> fig = nv.plot.network(nx.karate_club_graph(), color_by="club")
-    >>> [t.name for t in fig.data if t.legendgroup and t.legendgroup.startswith("node-")]
+    >>> [t.name for t in fig.data if t.showlegend]
     ['Mr. Hi', 'Officer']
     """
     frames = to_frames(data, time=time, category=category, labels=labels, node_attrs=node_attrs)

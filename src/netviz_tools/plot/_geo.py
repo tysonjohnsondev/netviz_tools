@@ -14,7 +14,14 @@ import plotly.graph_objects as go
 from netviz_tools._nxutil import has_weights
 from netviz_tools.plot._data import PlotData, Selector, to_frames
 from netviz_tools.plot._render import ShowLabels, figure, prepare, resolve_focus
-from netviz_tools.plot._resolve import EdgeSpec, NodeSpec, edge_values, node_values, select_top
+from netviz_tools.plot._resolve import (
+    EdgeSpec,
+    NodeSpec,
+    edge_values,
+    node_index,
+    node_values,
+    select_top,
+)
 
 __all__ = ["flow_map"]
 
@@ -49,7 +56,7 @@ def has_coordinates(g: nx.Graph[Any], coords: pd.DataFrame | None = None) -> boo
 
 def positions(table: pd.DataFrame, nodes: list[Hashable]) -> dict[Hashable, tuple[float, float]]:
     """Return ``{node: (lon, lat)}`` for nodes listed in a coordinate table."""
-    rows = table.reindex(nodes)
+    rows = table.reindex(node_index(nodes))
     lon = rows["lon"].to_numpy(dtype=float)
     lat = rows["lat"].to_numpy(dtype=float)
     return {n: (float(x), float(y)) for n, x, y in zip(nodes, lon, lat, strict=True)}
@@ -141,6 +148,9 @@ def flow_map(
         edge_width_by = "weight" if has_weights(u) else None
     directed = u.is_directed()
 
+    every = [e for g in frames.graphs.values() for e in g.edges(data=True)]
+    edge_values(every, edge_width_by, arg="edge_width_by", directed=directed)  # check the name
+
     # The top_n largest edges of each period (touching a focus node, if any).
     missing: set[str] = set()
     chosen: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
@@ -150,7 +160,7 @@ def flow_map(
             for a, b, d in g.edges(data=True)
             if a != b and (not focus_nodes or a in focus_nodes or b in focus_nodes)
         ]
-        w = edge_values(cand, edge_width_by, arg="edge_width_by", directed=directed)
+        w = edge_values(cand, edge_width_by, arg="edge_width_by", directed=directed, strict=False)
         rank = (
             pd.to_numeric(w, errors="coerce").fillna(0.0).to_numpy()
             if w is not None
@@ -172,7 +182,7 @@ def flow_map(
     size = node_values(u, size_by, arg="size_by", labels=lab, seed=seed)
     color = node_values(u, color_by, arg="color_by", labels=lab, seed=seed)
     if size is not None and not size.categorical:
-        selected = select_top(size.series.reindex(selected), None)
+        selected = select_top(size.series.reindex(node_index(selected)), None)
     scene = prepare(
         frames,
         nodes=selected,

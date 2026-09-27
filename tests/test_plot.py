@@ -25,7 +25,19 @@ def spec(fig: go.Figure) -> dict[str, Any]:
 
 
 def node_traces(fig: go.Figure) -> list[dict[str, Any]]:
-    return [t for t in spec(fig)["data"] if str(t.get("legendgroup", "")).startswith("node")]
+    """Traces of node markers (not the legend-only entries drawn when there is a focus)."""
+    return [
+        t
+        for t in spec(fig)["data"]
+        if str(t.get("legendgroup", "")).startswith("node")
+        and (t.get("x") or t.get("lon") or [0]) != [None]
+    ]
+
+
+def labels_shown(fig: go.Figure) -> list[str]:
+    """Non-empty node labels (they live in their own trace, drawn above the markers)."""
+    trace = next(t for t in spec(fig)["data"] if t.get("name") == "labels")
+    return [x for x in trace.get("text") or [] if x]
 
 
 def edge_hover(fig: go.Figure) -> list[str]:
@@ -180,7 +192,7 @@ def test_flow_map_focus_and_labels(wheat_2022: pd.DataFrame) -> None:
     assert len(hover) == 8
     assert all("Egypt" in h.split("<br>")[0] for h in hover)
     assert spec(fig)["layout"]["title"]["text"] == "Wheat flows of Egypt, 2022"
-    texts = [x for t in node_traces(fig) for x in t["text"] if x]
+    texts = labels_shown(fig)
     assert "Egypt" in texts
     assert len(texts) == 9
     egypt = [
@@ -314,6 +326,9 @@ def test_ranking_change(wheat: pd.DataFrame) -> None:
     layout = spec(fig)["layout"]
     assert layout["title"]["text"] == "Wheat: largest changes in exports + imports, 2022 to 2023"
     assert layout["xaxis"]["title"]["text"] == "Change in exports + imports (t)"
+    lo, hi = layout["xaxis"]["range"]  # room for the labels outside the longest bars
+    assert lo < min(x) * 1.1
+    assert hi > max(x) * 1.1
 
 
 # --- compare --------------------------------------------------------------------------------
@@ -329,13 +344,13 @@ def test_compare_brazil(sample: pd.DataFrame) -> None:
     assert bars["Exports"]["Maize (corn)"] > bars["Imports"]["Maize (corn)"]
     assert bars["Imports"]["Wheat"] > bars["Exports"]["Wheat"]
     ticks = [t for t in data if t["type"] == "scatter"]
-    assert [t["showlegend"] for t in ticks] == [True, False]
+    assert sorted(t["showlegend"] for t in ticks) == [False, True]  # one legend entry
     assert ticks[0]["name"] == "2023"
     layout = spec(fig)["layout"]
     assert layout["title"]["text"] == "Brazil: exports and imports by item, 2024"
     assert layout["xaxis"]["title"]["text"] == "Quantity (t)"
     assert layout["scattermode"] == "group"
-    hover = data[0]["hovertext"][0]
+    hover = next(t for t in data if t.get("name") == "Exports")["hovertext"][0]
     assert "Exports, 2024: " in hover
     assert "Exports, 2023: " in hover
     assert "change: " in hover

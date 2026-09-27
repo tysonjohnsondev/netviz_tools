@@ -41,7 +41,7 @@ OTHER_COLOR: Final = "#8a8986"
 MISSING_COLOR: Final = "#cfcfcb"
 OTHER_LABEL: Final = "Other"
 MISSING_LABEL: Final = "No value"
-EDGE_COLOR: Final = "rgba(110, 110, 110, 0.35)"
+EDGE_GREY: Final = "#6e6e6e"
 EDGE_FOCUS_COLOR: Final = "rgba(40, 40, 40, 0.7)"
 TEXT_COLOR: Final = "#3d3d3a"
 SURFACE: Final = "#ffffff"
@@ -175,7 +175,8 @@ def nice_ticks(lo: float, hi: float, *, log: bool = False) -> list[float]:
     if not (math.isfinite(lo) and math.isfinite(hi)) or hi <= lo:
         return [float(lo)]
     if log and hi >= 10.0:
-        first = math.floor(math.log10(lo)) if lo > 0 else 0
+        # log10(1 + x) squeezes everything below 1 together, so ticks start at 1
+        first = max(0, math.floor(math.log10(lo))) if lo > 0 else 0
         powers = [10.0**k for k in range(first, math.ceil(math.log10(hi)) + 1)]
         values = [m * p for p in powers for m in (1.0, 2.0, 5.0) if lo <= m * p <= hi]
         if len(values) > 6:
