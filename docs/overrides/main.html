@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{#- Download button for gallery notebooks. mkdocs-jupyter (include_source: true)
+    copies each .ipynb next to its rendered page and sets page.nb_url. The link
+    is relative so it also works when the site is served from a sub-path. -#}
+{% block content %}
+  {% if page.nb_url %}
+    <a href="{{ page.file.src_uri.split('/')[-1] }}" title="Download this notebook"
+       class="md-content__button md-icon" download>
+      {% include ".icons/material/download.svg" %}
+    </a>
+  {% endif %}
+  {{ super() }}
+{% endblock content %}

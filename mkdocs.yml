@@ -9,11 +9,13 @@ copyright: Code MIT licence. FAOSTAT data CC BY 4.0.
 strict: true
 exclude_docs: |
   hooks/
+  overrides/
 hooks:
   - docs/hooks/sphinx_roles.py
 
 theme:
   name: material
+  custom_dir: docs/overrides
   features:
     - navigation.sections
     - navigation.top

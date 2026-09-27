@@ -236,7 +236,7 @@ flows = faostat.load("Coffee, green", years=range(2015, 2025))
 
 The choice matters. The Russian Federation reports no wheat exports after 2021, so in exporter-reported data it has no wheat exports at all in 2022. Importer-reported data still show about 22.4 million tonnes that year. See the [wheat notebook](gallery/wheat-2022-shock.ipynb).
 
-**Trade value.** `load(..., measure="value")` returns trade value in `1000 USD` instead of physical quantity. Quantities are in `t`, `head` or `number`. Values and quantities are never mixed in one frame, but a few items (mostly live animals) have quantity rows in both `head` and `t`; filter on `unit` before building a graph, or `build_graph` raises `MixedUnitError`. The bundled sample contains quantities only.
+**Trade value.** `load(..., measure="value")` returns trade value in `1000 USD` instead of physical quantity. Quantities are in `t`, `head` or `number`. Values and quantities are never mixed in one frame, but the live-animal items (cattle, sheep, chickens and so on) have quantity rows in both `head` and `t`; filter on `unit` before building a graph, or `build_graph` raises `MixedUnitError`. The bundled sample contains quantities only.
 
 **Details.** `load(..., details=True)` adds `item_code`, `exporter_code`, `importer_code`, `reported_by` and the FAOSTAT `flag`. `self_loops=True` keeps flows from a country to itself (re-imports), which the store keeps but `load` drops by default.
 
