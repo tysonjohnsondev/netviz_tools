@@ -125,14 +125,14 @@ def unit_of(g: nx.Graph[Any]) -> str:
 
 def default_title(g: nx.Graph[Any], what: str) -> str:
     """Build a title such as ``"Wheat trade network, 2022"`` from graph metadata."""
-    item = g.graph.get("item")
-    year = g.graph.get("year")
-    head = f"{item} {what}" if isinstance(item, str) else what.capitalize()
-    if isinstance(year, int):
-        return f"{head}, {year}"
-    if isinstance(year, list) and year:
+    category = g.graph.get("category")
+    time = g.graph.get("time")
+    head = f"{category} {what}" if isinstance(category, str) else what.capitalize()
+    if isinstance(time, int):
+        return f"{head}, {time}"
+    if isinstance(time, list) and time:
         agg = g.graph.get("aggregate") or "sum"
-        return f"{head}, {min(year)} to {max(year)} ({agg})"
+        return f"{head}, {min(time)} to {max(time)} ({agg})"
     return head
 
 

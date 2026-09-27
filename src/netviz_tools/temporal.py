@@ -127,7 +127,7 @@ def metric_series(
     ----------
     graphs
         Graphs keyed by period, for example the output of
-        :func:`netviz_tools.graphs_by` with ``by="year"``.
+        :func:`netviz_tools.graphs_by` with ``by="time"``.
     metrics
         Built-in metric names; see :data:`GraphMetric`.
     custom
@@ -145,7 +145,7 @@ def metric_series(
     --------
     >>> import netviz_tools as nv
     >>> flows = nv.datasets.faostat.load_sample(items="Wheat")
-    >>> ts = nv.temporal.metric_series(nv.graphs_by(flows, by="year"), ["total_weight"])
+    >>> ts = nv.temporal.metric_series(nv.graphs_by(flows, by="time"), ["total_weight"])
     >>> int(ts.index.min())
     2010
     """

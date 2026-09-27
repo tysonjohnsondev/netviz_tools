@@ -30,4 +30,4 @@ def test_full_build_and_load(tmp_path: Path) -> None:
     assert store.is_dir()
     wheat = nv.datasets.faostat.load("Wheat", 2021, cache_dir=tmp_path)
     sample = nv.datasets.faostat.load_sample(items="Wheat", years=2021)
-    assert wheat["quantity"].sum() == pytest.approx(sample["quantity"].sum())
+    assert wheat["weight"].sum() == pytest.approx(sample["weight"].sum())

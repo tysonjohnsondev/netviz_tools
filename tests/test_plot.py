@@ -151,7 +151,7 @@ def test_flow_map_coordinate_sources() -> None:
 
 
 def test_time_series(flows: pd.DataFrame) -> None:
-    ts = nv.temporal.metric_series(nv.graphs_by(flows, by="year"), ["total_weight", "density"])
+    ts = nv.temporal.metric_series(nv.graphs_by(flows, by="time"), ["total_weight", "density"])
     fig = nv.plot.time_series(ts, ["total_weight"], title="t", y_title="tonnes")
     spec = as_json(fig)
     assert spec["data"][0]["x"] == [2020, 2021]

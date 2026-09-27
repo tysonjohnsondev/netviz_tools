@@ -3,18 +3,20 @@
 A *flow frame* is a :class:`pandas.DataFrame` with one row per directed flow and
 at least these columns:
 
-========== ========================================================
+========== ============================================================
 column     meaning
-========== ========================================================
-exporter   origin node (for trade data, the exporting country)
-importer   destination node (the importing country)
-year       integer period label
-item       what flows (a commodity, a product code, a migrant type)
-quantity   non-negative amount
-unit       unit of ``quantity``, for example ``"t"`` or ``"1000 USD"``
-========== ========================================================
+========== ============================================================
+source     origin node (for trade data, the exporting country)
+target     destination node (for trade data, the importing country)
+time       integer period label, for example a year
+category   what flows (a commodity, a product code, a migrant type)
+weight     non-negative amount
+unit       unit of ``weight``, for example ``"t"``, ``"people"`` or ``"1000 USD"``
+========== ============================================================
 
-Extra columns are allowed and preserved.
+Extra columns are allowed and preserved. Domain-specific display names (such as
+"Exporter" for ``source``) can be stored as a dict in ``flows.attrs["labels"]``;
+:func:`netviz_tools.datasets.faostat.load` does this for trade data.
 """
 
 from __future__ import annotations
@@ -29,20 +31,20 @@ from netviz_tools.errors import SchemaError
 
 __all__ = ["FLOW_COLUMNS", "FlowFrame", "to_flowframe", "validate_flows"]
 
-FLOW_COLUMNS: Final = ("exporter", "importer", "year", "item", "quantity", "unit")
+FLOW_COLUMNS: Final = ("source", "target", "time", "category", "weight", "unit")
 """Required columns of a flow frame, in canonical order."""
 
 FlowFrame: TypeAlias = pd.DataFrame
 """A :class:`pandas.DataFrame` that satisfies :func:`validate_flows`."""
 
-_KEY_COLUMNS: Final = ("exporter", "importer", "item", "unit")
+_KEY_COLUMNS: Final = ("source", "target", "category", "unit")
 
 
 def validate_flows(flows: pd.DataFrame) -> FlowFrame:
     """Check that a DataFrame follows the flow schema.
 
     The check is light: required columns exist, key columns have no missing
-    values, ``year`` is an integer column, and ``quantity`` is numeric, finite
+    values, ``time`` is an integer column, and ``weight`` is numeric, finite
     and non-negative. All problems are collected and reported together.
 
     Parameters
@@ -63,8 +65,8 @@ def validate_flows(flows: pd.DataFrame) -> FlowFrame:
     Examples
     --------
     >>> import pandas as pd
-    >>> df = pd.DataFrame({"exporter": ["A"], "importer": ["B"], "year": [2020],
-    ...                    "item": ["Wheat"], "quantity": [1.0], "unit": ["t"]})
+    >>> df = pd.DataFrame({"source": ["A"], "target": ["B"], "time": [2020],
+    ...                    "category": ["Wheat"], "weight": [1.0], "unit": ["t"]})
     >>> validate_flows(df) is df
     True
     """
@@ -75,18 +77,18 @@ def validate_flows(flows: pd.DataFrame) -> FlowFrame:
     for col in _KEY_COLUMNS:
         if col in flows.columns and flows[col].isna().any():
             problems.append(f"column {col!r} has {int(flows[col].isna().sum())} missing values")
-    if "year" in flows.columns and not pd.api.types.is_integer_dtype(flows["year"]):
-        problems.append(f"column 'year' must be integer, not {flows['year'].dtype}")
-    if "quantity" in flows.columns:
-        q = flows["quantity"]
-        if not pd.api.types.is_numeric_dtype(q) or pd.api.types.is_bool_dtype(q):
-            problems.append(f"column 'quantity' must be numeric, not {q.dtype}")
+    if "time" in flows.columns and not pd.api.types.is_integer_dtype(flows["time"]):
+        problems.append(f"column 'time' must be integer, not {flows['time'].dtype}")
+    if "weight" in flows.columns:
+        w = flows["weight"]
+        if not pd.api.types.is_numeric_dtype(w) or pd.api.types.is_bool_dtype(w):
+            problems.append(f"column 'weight' must be numeric, not {w.dtype}")
         else:
-            values = q.to_numpy(dtype=float, na_value=np.nan)
+            values = w.to_numpy(dtype=float, na_value=np.nan)
             if not np.isfinite(values).all():
-                problems.append("column 'quantity' has missing or infinite values")
+                problems.append("column 'weight' has missing or infinite values")
             elif (values < 0).any():
-                problems.append("column 'quantity' has negative values")
+                problems.append("column 'weight' has negative values")
     if problems:
         raise SchemaError(problems)
     return flows
@@ -99,8 +101,8 @@ def to_flowframe(
 ) -> FlowFrame:
     """Convert any edge list into a flow frame.
 
-    Use this to bring your own bilateral data (migration, shipping, payments)
-    into the schema that the rest of the library expects.
+    Use this to bring your own flow data (trade, migration, shipping,
+    payments) into the schema that the rest of the library expects.
 
     Parameters
     ----------
@@ -108,16 +110,17 @@ def to_flowframe(
         Source table. It is not modified.
     columns
         Mapping from column names in ``df`` to flow-frame column names, for
-        example ``{"origin": "exporter", "dest": "importer", "n": "quantity"}``.
+        example ``{"origin": "source", "dest": "target", "n": "weight"}``.
     **constants
         Values for required columns that ``df`` does not have, for example
-        ``item="migrants", unit="people", year=2020``.
+        ``category="migrants", unit="people", time=2020``.
 
     Returns
     -------
     FlowFrame
         A new DataFrame with the six schema columns first, followed by any
-        other columns of ``df``. ``year`` is cast to ``int64``.
+        other columns of ``df``. A whole-number ``time`` column is cast to
+        ``int64``. ``df.attrs`` (for example ``"labels"``) is carried over.
 
     Raises
     ------
@@ -129,10 +132,10 @@ def to_flowframe(
     --------
     >>> import pandas as pd
     >>> raw = pd.DataFrame({"src": ["A", "B"], "dst": ["B", "C"], "n": [5, 7]})
-    >>> ff = to_flowframe(raw, {"src": "exporter", "dst": "importer", "n": "quantity"},
-    ...                   year=2020, item="people", unit="persons")
+    >>> ff = to_flowframe(raw, {"src": "source", "dst": "target", "n": "weight"},
+    ...                   time=2020, category="people", unit="persons")
     >>> list(ff.columns)
-    ['exporter', 'importer', 'year', 'item', 'quantity', 'unit']
+    ['source', 'target', 'time', 'category', 'weight', 'unit']
     """
     out = df.rename(columns=dict(columns or {}))
     clashes = sorted(set(constants) & set(out.columns))
@@ -144,10 +147,10 @@ def to_flowframe(
     out = out.copy()
     for col, value in constants.items():
         out[col] = value
-    if "year" in out.columns and pd.api.types.is_numeric_dtype(out["year"]):
-        years = out["year"].to_numpy(dtype=float, na_value=np.nan)
-        if np.isfinite(years).all() and (years == np.round(years)).all():
-            out["year"] = out["year"].astype("int64")
+    if "time" in out.columns and pd.api.types.is_numeric_dtype(out["time"]):
+        times = out["time"].to_numpy(dtype=float, na_value=np.nan)
+        if np.isfinite(times).all() and (times == np.round(times)).all():
+            out["time"] = out["time"].astype("int64")
     ordered = [c for c in FLOW_COLUMNS if c in out.columns]
     ordered += [c for c in out.columns if c not in FLOW_COLUMNS]
     return validate_flows(out[ordered])

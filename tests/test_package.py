@@ -6,6 +6,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 import netviz_tools as nv
 
 
@@ -17,6 +19,23 @@ def test_public_api() -> None:
     for name in nv.__all__:
         assert hasattr(nv, name), name
     assert isinstance(nv.UnknownItemError("x"), nv.NetvizError)
+    assert "compare_items" not in nv.__all__
+    assert not hasattr(nv, "UnknownCountryError")
+
+
+def test_unknown_name_errors_exported() -> None:
+    from netviz_tools import errors
+
+    assert nv.UnknownNameError is errors.UnknownNameError
+    assert nv.UnknownNodeError is errors.UnknownNodeError
+    assert {"UnknownNameError", "UnknownNodeError"} <= set(nv.__all__) & set(errors.__all__)
+    node = nv.UnknownNodeError("Atlantis", ["Atlanta"])
+    assert isinstance(node, nv.UnknownNameError)
+    assert node.kind == "node"
+    assert str(node) == "unknown node 'Atlantis'. Did you mean: 'Atlanta'?"
+    assert isinstance(nv.UnknownItemError("x"), nv.UnknownNameError)
+    with pytest.raises(nv.UnknownNameError, match=r"^unknown node 'x'$"):
+        raise nv.UnknownNodeError("x")
 
 
 def test_import_has_no_side_effects(tmp_path: Path) -> None:

@@ -17,10 +17,10 @@ __all__ = [
     "SchemaError",
     "SourceHashMismatchError",
     "StoreNotFoundError",
-    "UnknownCountryError",
     "UnknownItemError",
     "UnknownMetricError",
     "UnknownNameError",
+    "UnknownNodeError",
 ]
 
 
@@ -43,7 +43,7 @@ class SchemaError(NetvizError, ValueError):
 
 
 class MixedSliceError(NetvizError, ValueError):
-    """Flows span several years or items but no aggregation was requested."""
+    """Flows span several time periods or categories but no aggregation was requested."""
 
 
 class MixedUnitError(NetvizError, ValueError):
@@ -64,7 +64,7 @@ class UnknownNameError(NetvizError, LookupError):
     Parameters
     ----------
     kind
-        What was being looked up, for example ``"item"`` or ``"country"``.
+        What was being looked up, for example ``"item"`` or ``"node"``.
     name
         The name that was not found.
     suggestions
@@ -86,17 +86,17 @@ class UnknownNameError(NetvizError, LookupError):
 
 
 class UnknownItemError(UnknownNameError):
-    """An item (commodity) name or code is not in the catalogue."""
+    """A FAOSTAT item (commodity) name or code is not in the catalogue."""
 
     def __init__(self, name: object, suggestions: Sequence[str] = ()) -> None:
         super().__init__("item", name, suggestions)
 
 
-class UnknownCountryError(UnknownNameError):
-    """A country (node) name is not present in the flows."""
+class UnknownNodeError(UnknownNameError):
+    """A node (for trade data, a country) is not present in the flows."""
 
     def __init__(self, name: object, suggestions: Sequence[str] = ()) -> None:
-        super().__init__("country", name, suggestions)
+        super().__init__("node", name, suggestions)
 
 
 class StoreNotFoundError(NetvizError, FileNotFoundError):

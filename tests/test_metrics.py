@@ -13,7 +13,7 @@ from netviz_tools import InsufficientDataError, UnknownMetricError
 
 @pytest.fixture
 def small(flows: pd.DataFrame) -> nx.DiGraph[Any]:
-    g = nv.build_graph(flows[flows.year == 2020])
+    g = nv.build_graph(flows[flows.time == 2020])
     assert isinstance(g, nx.DiGraph)
     return g
 

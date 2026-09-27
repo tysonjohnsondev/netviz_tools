@@ -57,24 +57,52 @@ def test_load_sample_schema_and_filters() -> None:
     df = faostat.load_sample(items="wheat", years=range(2021, 2023))
     nv.validate_flows(df)
     assert df.columns.tolist() == list(nv.FLOW_COLUMNS)
-    assert sorted(df["year"].unique()) == [2021, 2022]
-    assert set(df["item"]) == {"Wheat"}
-    assert (df["exporter"] != df["importer"]).all()
+    assert sorted(df["time"].unique()) == [2021, 2022]
+    assert set(df["category"]) == {"Wheat"}
+    assert (df["source"] != df["target"]).all()
     assert set(df["unit"]) == {"t"}
+
+
+def test_labels_attached_to_every_frame() -> None:
+    assert dict(faostat.LABELS) == {
+        "source": "Exporter",
+        "target": "Importer",
+        "time": "Year",
+        "category": "Item",
+        "weight": "Quantity",
+        "node": "Country",
+        "out": "Exports",
+        "in": "Imports",
+    }
+    assert "LABELS" in faostat.__all__
+    df = faostat.load_sample(items="Wheat", years=2022)
+    assert df.attrs["labels"] == dict(faostat.LABELS)
+    df.attrs["labels"]["source"] = "changed"
+    assert faostat.LABELS["source"] == "Exporter"  # each frame gets its own copy
+    assert faostat.load_sample(items="Wheat", years=2022).attrs["labels"]["source"] == "Exporter"
+    g = nv.build_graph(faostat.load_sample(items="Wheat", years=2022))
+    assert g.graph["labels"]["target"] == "Importer"
 
 
 def test_load_sample_defaults_and_details() -> None:
     df = faostat.load_sample(details=True)
-    assert set(df["item"]) == {"Wheat", "Maize (corn)", "Soya beans"}
-    assert df["year"].min() == 2010
+    assert set(df["category"]) == {"Wheat", "Maize (corn)", "Soya beans"}
+    assert df["time"].min() == 2010
     assert set(df["reported_by"]) == {"importer"}
-    assert {"item_code", "exporter_code", "importer_code", "flag"} <= set(df.columns)
+    assert df.columns.tolist() == [
+        *nv.FLOW_COLUMNS,
+        "item_code",
+        "source_code",
+        "target_code",
+        "reported_by",
+        "flag",
+    ]
 
 
 def test_reporter_perspectives_on_sample() -> None:
     def russia(reporter: faostat.Reporter) -> float:
         df = faostat.load_sample(items=15, years=2022, reporter=reporter)
-        return float(df.loc[df.exporter == "Russian Federation", "quantity"].sum())
+        return float(df.loc[df.source == "Russian Federation", "weight"].sum())
 
     # The Russian Federation reports no wheat exports after 2021.
     assert russia("exporter") == 0.0
@@ -82,13 +110,13 @@ def test_reporter_perspectives_on_sample() -> None:
     assert russia("combined") == pytest.approx(russia("importer"))
     combined = faostat.load_sample(items=15, years=2022, reporter="combined", details=True)
     assert set(combined["reported_by"]) == {"importer", "exporter"}
-    keys = ["exporter", "importer", "item", "year"]
+    keys = ["source", "target", "category", "time"]
     assert not combined.duplicated(keys).any()
 
 
 def test_load_sample_self_loops() -> None:
     with_loops = faostat.load_sample(items="Wheat", self_loops=True)
-    assert (with_loops["exporter"] == with_loops["importer"]).any()
+    assert (with_loops["source"] == with_loops["target"]).any()
 
 
 def test_load_sample_errors() -> None:
@@ -159,41 +187,47 @@ def test_build_store_and_manifest(fake_store: Path, fake_zip: Path) -> None:
 def test_load_from_store(fake_store: Path) -> None:
     imp = faostat.load("Wheat", cache_dir=fake_store)
     nv.validate_flows(imp)
-    assert set(zip(imp.exporter, imp.importer, imp.year, strict=True)) == {
+    assert imp.attrs["labels"]["weight"] == "Quantity"
+    assert set(zip(imp.source, imp.target, imp.time, strict=True)) == {
         ("Russian Federation", "Egypt", 2021),
         ("Ukraine", "Egypt", 2021),
         ("Russian Federation", "Egypt", 2022),
         ("Russian Federation", "Türkiye", 2022),
     }
     exp = faostat.load("Wheat", 2022, reporter="exporter", cache_dir=fake_store)
-    assert set(exp.exporter) == {"Ukraine", "Türkiye"}  # self-loop dropped, zero dropped
+    assert set(exp.source) == {"Ukraine", "Türkiye"}  # self-loop dropped, zero dropped
     comb = faostat.load(
         "Wheat", [2021, 2022], reporter="combined", cache_dir=fake_store, details=True
     )
     ru_eg_2021 = comb[
-        (comb.exporter == "Russian Federation") & (comb.year == 2021) & (comb.importer == "Egypt")
+        (comb.source == "Russian Federation") & (comb.time == 2021) & (comb.target == "Egypt")
     ]
-    assert ru_eg_2021["quantity"].tolist() == [900.0]  # importer report wins
+    assert ru_eg_2021["weight"].tolist() == [900.0]  # importer report wins
     assert ru_eg_2021["reported_by"].tolist() == ["importer"]
     ru_tr_2021 = comb[
-        (comb.exporter == "Russian Federation") & (comb.importer == "Türkiye") & (comb.year == 2021)
+        (comb.source == "Russian Federation") & (comb.target == "Türkiye") & (comb.time == 2021)
     ]
     assert ru_tr_2021["reported_by"].tolist() == ["exporter"]  # only the exporter reported
     loops = faostat.load("Wheat", 2022, reporter="exporter", self_loops=True, cache_dir=fake_store)
-    assert ("Türkiye", "Türkiye") in set(zip(loops.exporter, loops.importer, strict=True))
+    assert ("Türkiye", "Türkiye") in set(zip(loops.source, loops.target, strict=True))
+    ru_eg = comb[(comb.source == "Russian Federation") & (comb.target == "Egypt")]
+    assert set(ru_eg["source_code"]) == {185}
+    assert set(ru_eg["target_code"]) == {59}
 
 
 def test_units_and_values_normalized(fake_store: Path) -> None:
     horses = faostat.load("Horses", reporter="combined", cache_dir=fake_store, details=True)
     by_reporter = horses.set_index("reported_by")
     assert set(horses["unit"]) == {"head"}
-    assert by_reporter.loc["importer", "quantity"] == 500.0  # 0.5 thousand head
+    assert by_reporter.loc["importer", "weight"] == 500.0  # 0.5 thousand head
     assert faostat.load("Bees", reporter="exporter", cache_dir=fake_store)["unit"].tolist() == [
         "number"
     ]
     value = faostat.load(15, 2021, measure="value", cache_dir=fake_store)
     assert value["unit"].tolist() == ["1000 USD"]
-    assert value["quantity"].tolist() == [260.0]
+    assert value["weight"].tolist() == [260.0]
+    assert value.attrs["labels"]["weight"] == "Value"
+    assert faostat.LABELS["weight"] == "Quantity"
     with pytest.raises(ValueError, match="measure"):
         faostat.load(15, measure="price", cache_dir=fake_store)  # type: ignore[arg-type]
 
@@ -202,6 +236,7 @@ def test_known_item_without_rows_returns_empty(fake_store: Path) -> None:
     empty = faostat.load("Maize (corn)", cache_dir=fake_store)
     assert empty.empty
     assert empty.columns.tolist() == list(nv.FLOW_COLUMNS)
+    assert empty.attrs["labels"] == dict(faostat.LABELS)
 
 
 def test_build_store_reuses_existing(fake_store: Path, tmp_path: Path) -> None:
@@ -283,8 +318,9 @@ def test_citation_template() -> None:
 
 def test_loaded_frames_are_plain_objects() -> None:
     df = faostat.load_sample(items="Wheat", years=2022)
-    assert df["exporter"].dtype == object
-    assert pd.api.types.is_integer_dtype(df["year"])
+    assert df["source"].dtype == object
+    assert df["category"].dtype == object
+    assert pd.api.types.is_integer_dtype(df["time"])
 
 
 def test_connect_survives_progress_bar_refusal(monkeypatch: pytest.MonkeyPatch) -> None:

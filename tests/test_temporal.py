@@ -16,7 +16,7 @@ def _max_weight(g: nx.Graph[Any]) -> float:
 
 
 def test_metric_series_values(flows: pd.DataFrame) -> None:
-    graphs = nv.graphs_by(flows, by="year")
+    graphs = nv.graphs_by(flows, by="time")
     ts = nv.temporal.metric_series(
         graphs,
         [
@@ -30,10 +30,10 @@ def test_metric_series_values(flows: pd.DataFrame) -> None:
             "in_strength_hhi",
         ],
         custom={"max_weight": _max_weight},
-        index_name="year",
+        index_name="time",
     )
     assert ts.index.tolist() == [2020, 2021]
-    assert ts.index.name == "year"
+    assert ts.index.name == "time"
     r2020 = ts.loc[2020]
     assert r2020["n_nodes"] == 3
     assert r2020["n_edges"] == 4
@@ -65,17 +65,19 @@ def test_metrics_edge_cases() -> None:
 
 def test_unknown_metric(flows: pd.DataFrame) -> None:
     with pytest.raises(UnknownMetricError):
-        nv.temporal.metric_series(nv.graphs_by(flows, by="year"), ["diameter"])  # type: ignore[list-item]
+        nv.temporal.metric_series(nv.graphs_by(flows, by="time"), ["diameter"])  # type: ignore[list-item]
 
 
 def test_tuple_keys_make_multiindex(flows: pd.DataFrame) -> None:
-    ts = nv.temporal.metric_series(nv.graphs_by(flows), ["n_edges"], index_name=["year", "item"])
+    ts = nv.temporal.metric_series(
+        nv.graphs_by(flows), ["n_edges"], index_name=["time", "category"]
+    )
     assert isinstance(ts.index, pd.MultiIndex)
-    assert ts.index.names == ["year", "item"]
+    assert ts.index.names == ["time", "category"]
 
 
 def test_centrality_series(flows: pd.DataFrame) -> None:
-    graphs = nv.graphs_by(flows, by="year")
+    graphs = nv.graphs_by(flows, by="time")
     cs = nv.temporal.centrality_series(graphs, "out_strength")
     assert cs.loc[2021, "A"] == 20.0
     assert cs.columns.name == "node"

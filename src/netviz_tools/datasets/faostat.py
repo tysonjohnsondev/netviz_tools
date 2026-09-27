@@ -18,6 +18,29 @@ This module works in two steps:
 with the package (wheat, maize and soya beans, 2010 to 2024), so the
 examples and tests work offline.
 
+Flow frames and labels
+----------------------
+The store keeps FAOSTAT's own vocabulary, but :func:`load` and
+:func:`load_sample` return the library's generic flow frame
+(:data:`netviz_tools.FLOW_COLUMNS`):
+
+========== ==========================================
+column     FAOSTAT meaning
+========== ==========================================
+source     exporting country
+target     importing country
+time       year
+category   item (commodity)
+weight     quantity, or trade value with ``measure="value"``
+unit       ``t``, ``head``, ``number`` or ``1000 USD``
+========== ==========================================
+
+Every returned frame also carries a copy of :data:`LABELS` in
+``flows.attrs["labels"]`` (with ``"weight": "Value"`` for trade values).
+:func:`netviz_tools.build_graph` copies it into ``G.graph["labels"]``, and the
+plots use these display labels, so FAOSTAT charts say "Exporter" and
+"Importer" without you having to type them.
+
 Reporting perspective
 ---------------------
 Every trade flow can be reported twice: by the exporting country and by the
@@ -30,6 +53,9 @@ lets you choose:
 * ``"exporter"``: flows as reported by the exporting country.
 * ``"combined"``: the importer's report where one exists, otherwise the
   exporter's, decided per (exporter, importer, item, year).
+
+The ``reporter`` parameter and the ``reported_by`` column of ``details=True``
+keep the FAOSTAT words ``"importer"`` and ``"exporter"``.
 
 Data licence
 ------------
@@ -50,7 +76,7 @@ import os
 import shutil
 import tempfile
 import zipfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from importlib import resources
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias, get_args
@@ -73,6 +99,7 @@ if TYPE_CHECKING:
 __all__ = [
     "CITATION",
     "ENV_CACHE_DIR",
+    "LABELS",
     "Measure",
     "Reporter",
     "build_store",
@@ -101,6 +128,22 @@ CITATION: Final = (
     "https://www.fao.org/faostat/en/#data/TM. Licence: CC-BY-4.0."
 )
 """Citation template required by the FAO database terms of use."""
+
+LABELS: Final[Mapping[str, str]] = {
+    "source": "Exporter",
+    "target": "Importer",
+    "time": "Year",
+    "category": "Item",
+    "weight": "Quantity",
+    "node": "Country",
+    "out": "Exports",
+    "in": "Imports",
+}
+"""Display labels for FAOSTAT trade flows, keyed by generic flow-frame term.
+
+:func:`load` and :func:`load_sample` attach a copy to every frame as
+``flows.attrs["labels"]`` (with ``"weight": "Value"`` when
+``measure="value"``); graphs and plots pick them up from there."""
 
 STORE_DIRNAME: Final = "faostat_trade"
 SAMPLE_FILE: Final = "faostat_trade_sample.parquet"
@@ -583,19 +626,29 @@ def _query(
     else:
         body = f"{base} AND reported_by = ?"
         args.append(reporter)
-    extra = ", item_code, exporter_code, importer_code, reported_by, flag" if details else ""
+    extra = (
+        ", item_code, exporter_code AS source_code, importer_code AS target_code, reported_by, flag"
+        if details
+        else ""
+    )
+    # The store keeps FAOSTAT names; the result uses the generic flow-frame names.
     sql = (
-        f"SELECT exporter, importer, CAST(year AS BIGINT) AS year, item, value AS quantity, unit"
-        f"{extra} FROM ({body}) ORDER BY item, year, exporter, importer"
+        "SELECT exporter AS source, importer AS target, CAST(year AS BIGINT) AS time, "
+        f"item AS category, value AS weight, unit{extra} FROM ({body}) "
+        "ORDER BY category, time, source, target"
     )
     con = _connect()
     try:
         df = con.execute(sql, args).df()
     finally:
         con.close()
-    for col in ("exporter", "importer", "item", "unit", "reported_by", "flag"):
+    for col in ("source", "target", "category", "unit", "reported_by", "flag"):
         if col in df.columns:
             df[col] = df[col].astype(object)
+    labels = dict(LABELS)
+    if measure == "value":
+        labels["weight"] = "Value"
+    df.attrs["labels"] = labels
     return df
 
 
@@ -628,15 +681,20 @@ def load(
     self_loops
         Keep flows reported between a country and itself (re-imports).
     details
-        Add ``item_code``, ``exporter_code``, ``importer_code``,
-        ``reported_by`` and ``flag`` columns.
+        Add ``item_code``, ``source_code`` and ``target_code`` (FAOSTAT area
+        codes), ``reported_by`` (``"exporter"`` or ``"importer"``) and
+        ``flag`` columns.
     cache_dir
         Cache directory that holds the store.
 
     Returns
     -------
     FlowFrame
-        Sorted by item, year, exporter and importer.
+        Columns ``source`` (exporter), ``target`` (importer), ``time``
+        (year), ``category`` (item), ``weight`` (quantity or value) and
+        ``unit``, sorted by category, time, source and target.
+        ``flows.attrs["labels"]`` holds a copy of :data:`LABELS`, which plots
+        use for axis and hover labels.
 
     Raises
     ------
@@ -704,7 +762,11 @@ def load_sample(
     Returns
     -------
     FlowFrame
-        Sorted by item, year, exporter and importer.
+        The same columns as :func:`load`: ``source`` (exporter), ``target``
+        (importer), ``time`` (year), ``category`` (item), ``weight``
+        (quantity) and ``unit``, sorted by category, time, source and target.
+        ``flows.attrs["labels"]`` holds a copy of :data:`LABELS`, which plots
+        use for axis and hover labels.
 
     Raises
     ------
@@ -717,7 +779,9 @@ def load_sample(
     >>> from netviz_tools.datasets import faostat
     >>> flows = faostat.load_sample(items="Wheat", years=2022)
     >>> flows.columns.tolist()
-    ['exporter', 'importer', 'year', 'item', 'quantity', 'unit']
+    ['source', 'target', 'time', 'category', 'weight', 'unit']
+    >>> flows.attrs["labels"]["source"], flows.attrs["labels"]["target"]
+    ('Exporter', 'Importer')
     """
     sample_items = _sample_items()
     if items is None:

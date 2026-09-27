@@ -132,14 +132,14 @@ def fake_store(tmp_path: Path, fake_zip: Path) -> Path:
 
 @pytest.fixture
 def flows() -> pd.DataFrame:
-    """A small hand-made flow frame with two years and one item."""
+    """A small hand-made flow frame with two time values and one category."""
     return pd.DataFrame(
         {
-            "exporter": ["A", "A", "B", "C", "A", "B", "C"],
-            "importer": ["B", "C", "C", "A", "B", "A", "C"],
-            "year": [2020, 2020, 2020, 2020, 2021, 2021, 2021],
-            "item": ["x"] * 7,
-            "quantity": [10.0, 5.0, 2.0, 1.0, 20.0, 4.0, 3.0],
+            "source": ["A", "A", "B", "C", "A", "B", "C"],
+            "target": ["B", "C", "C", "A", "B", "A", "C"],
+            "time": [2020, 2020, 2020, 2020, 2021, 2021, 2021],
+            "category": ["x"] * 7,
+            "weight": [10.0, 5.0, 2.0, 1.0, 20.0, 4.0, 3.0],
             "unit": ["t"] * 7,
         }
     )
