@@ -285,3 +285,23 @@ def test_loaded_frames_are_plain_objects() -> None:
     df = faostat.load_sample(items="Wheat", years=2022)
     assert df["exporter"].dtype == object
     assert pd.api.types.is_integer_dtype(df["year"])
+
+
+def test_connect_survives_progress_bar_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DuckDB rejects the progress-bar setting in Jupyter without ipywidgets."""
+    import duckdb
+
+    real_connect = duckdb.connect
+
+    class _Refusing:
+        def __init__(self) -> None:
+            self._con = real_connect(":memory:")
+
+        def execute(self, query: str) -> object:
+            if "enable_progress_bar" in query:
+                raise duckdb.InvalidInputException("required package 'ipywidgets' is missing")
+            return self._con.execute(query)
+
+    monkeypatch.setattr(duckdb, "connect", lambda *a, **k: _Refusing())
+    con = faostat._connect()
+    assert con.execute("SELECT 1").fetchone() == (1,)

@@ -26,7 +26,7 @@ reporting (the Russian Federation reports no exports after 2021). ``load``
 lets you choose:
 
 * ``"importer"`` (default): flows as reported by the importing country. More
-  countries report imports than exports (for wheat in 2021, 155 against 103).
+  countries report imports than exports (for wheat in 2021, 155 against 99).
 * ``"exporter"``: flows as reported by the exporting country.
 * ``"combined"``: the importer's report where one exists, otherwise the
   exporter's, decided per (exporter, importer, item, year).
@@ -41,6 +41,7 @@ https://www.fao.org/faostat/en/#data/TM. Licence: CC-BY-4.0." Use
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import functools
 import hashlib
@@ -369,7 +370,10 @@ def _connect(threads: int | None = None) -> duckdb.DuckDBPyConnection:
     import duckdb
 
     con = duckdb.connect(":memory:")
-    con.execute("SET enable_progress_bar = false")
+    # Inside Jupyter, DuckDB refuses this setting when ipywidgets is not
+    # installed. The default connection still runs queries, so carry on.
+    with contextlib.suppress(duckdb.InvalidInputException):
+        con.execute("SET enable_progress_bar = false")
     if threads is not None:
         con.execute(f"SET threads = {int(threads)}")
     return con
@@ -691,7 +695,7 @@ def load_sample(
     Parameters
     ----------
     items
-        Items to keep; defaults to all four sample items.
+        Items to keep; defaults to all three sample items.
     years
         Years to keep; defaults to all.
     reporter, self_loops, details
