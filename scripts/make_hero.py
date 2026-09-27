@@ -54,11 +54,19 @@ def main() -> None:
             width=WIDTH,
             height=HEIGHT,
             showlegend=fig is geo,
-            legend={"orientation": "h", "y": -0.02, "x": 0.5, "xanchor": "center", "title": {"text": ""}},
+            legend={
+                "orientation": "h",
+                "y": -0.02,
+                "x": 0.5,
+                "xanchor": "center",
+                "title": {"text": ""},
+            },
             title={"x": 0.5, "xanchor": "center", "font": {"size": 16}},
         )
         panels.append(Image.open(io.BytesIO(fig.to_image(format="png", scale=SCALE))))
-    canvas = Image.new("RGB", (sum(p.width for p in panels), max(p.height for p in panels)), "white")
+    canvas = Image.new(
+        "RGB", (sum(p.width for p in panels), max(p.height for p in panels)), "white"
+    )
     x = 0
     for p in panels:
         canvas.paste(p, (x, 0))

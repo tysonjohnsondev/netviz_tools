@@ -90,8 +90,8 @@ Sizes and colours are log-scaled when values span more than two orders of magnit
 With a flow table spanning several periods, or a mapping `{period: graph}`:
 
 - `network` and `flow_map` become animations with a play button and a time slider, one frame per period. Node positions and scales stay fixed across frames, so movement means change.
-- `ranking` and `compare` show the last period and mark the one before, and hover gives the change. `ranking(..., change=True)` ranks by the change itself.
-- `time_series` draws one line per category, or a focus node's outgoing and incoming totals per period. `change=True` plots the change from the previous period.
+- `ranking` and `compare` show the last period and mark the one before, and hover gives the change. `ranking(..., change=True)` ranks by the change itself, in the data's unit, with the percentage as a label.
+- `time_series` draws one line per category, or a focus node's outgoing and incoming totals per period. `change=True` plots the change from the previous period in percent.
 
 ### Display labels
 
