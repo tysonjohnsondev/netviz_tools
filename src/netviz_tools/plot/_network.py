@@ -129,7 +129,8 @@ def _pack_components(
     """Lay out each connected component with ``place`` and pack them in rows.
 
     Spectral and Kamada-Kawai layouts are meant for connected graphs: on
-    several components they put all but one on top of each other. Each
+    several components they put all but one on top of each other, and a
+    spring layout pushes small components and isolated nodes far away. Each
     component gets a box whose side grows with the square root of its size,
     largest first; isolated nodes fill the last rows.
     """
@@ -199,9 +200,13 @@ def compute_layout(
     connected = nx.is_connected(und)
     if layout == "spring":
         iterations = 50 if n <= 500 else max(20, round(25_000 / n))
-        raw = nx.spring_layout(
-            und, **{"seed": seed, "weight": None, "iterations": iterations, **opts}
-        )
+        sp_kw = {"seed": seed, "weight": None, "iterations": iterations, **opts}
+        if connected:
+            raw = nx.spring_layout(und, **sp_kw)
+        else:
+            # Unconnected nodes feel only repulsion and drift far away, which
+            # squeezes the rest of the drawing; pack components instead.
+            raw = _pack_components(und, lambda c: nx.spring_layout(c, **sp_kw))
     elif layout == "kamada_kawai":
         if n > 500:
             warnings.warn(
