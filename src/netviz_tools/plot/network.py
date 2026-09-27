@@ -174,7 +174,7 @@ def network(
                     name=f"edges {b}",
                 )
             )
-        arrow = "→" if sub.is_directed() else "—"
+        arrow = "→" if sub.is_directed() else "↔"
         fig.add_trace(
             go.Scatter(
                 x=[(pos[u][0] + pos[v][0]) / 2 for u, v, _ in edges],

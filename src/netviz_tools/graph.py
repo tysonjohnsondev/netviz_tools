@@ -133,10 +133,9 @@ def build_graph(
         .groupby(["u", "v"], sort=True)["w"]
         .sum()
     )
-    n_slices = 1
     present = [c for c in _SLICE_COLUMNS if c in flows.columns]
-    if aggregate == "mean" and present:
-        n_slices = max(len(flows[present].drop_duplicates()), 1)
+    n_slices = max(len(flows[present].drop_duplicates()), 1) if present else 1
+    if aggregate == "mean":
         edges = edges / n_slices
 
     g: nx.DiGraph[Any] | nx.Graph[Any] = nx.DiGraph() if directed else nx.Graph()

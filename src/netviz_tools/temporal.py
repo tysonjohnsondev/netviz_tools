@@ -146,8 +146,8 @@ def metric_series(
     >>> import netviz_tools as nv
     >>> flows = nv.datasets.faostat.load_sample(items="Wheat")
     >>> ts = nv.temporal.metric_series(nv.graphs_by(flows, by="year"), ["total_weight"])
-    >>> ts.index.min() >= 2010
-    True
+    >>> int(ts.index.min())
+    2010
     """
     keys = list(graphs)
     rows = []

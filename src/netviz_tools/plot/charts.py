@@ -71,7 +71,7 @@ def time_series(
             fig.add_trace(
                 go.Scatter(
                     x=x,
-                    y=df[col],
+                    y=df[col].tolist(),
                     mode="lines+markers",
                     name=col,
                     showlegend=False,
@@ -93,7 +93,7 @@ def time_series(
             fig.add_trace(
                 go.Scatter(
                     x=x,
-                    y=df[col],
+                    y=df[col].tolist(),
                     mode="lines+markers",
                     name=str(col),
                     line={"width": 2, "color": color},
@@ -137,8 +137,8 @@ def degree_distribution(
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=uniq,
-            y=ccdf,
+            x=uniq.tolist(),
+            y=ccdf.tolist(),
             mode="markers",
             name="observed",
             marker={"size": 8, "color": "#52514e", "line": {"width": 1, "color": "#ffffff"}},
@@ -156,8 +156,8 @@ def degree_distribution(
     for dist, color, label in curves:
         fig.add_trace(
             go.Scatter(
-                x=grid,
-                y=frac * fit.ccdf(grid, dist),
+                x=grid.tolist(),
+                y=(frac * fit.ccdf(grid, dist)).tolist(),
                 mode="lines",
                 name=label,
                 line={"width": 2, "color": color},

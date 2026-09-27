@@ -320,9 +320,8 @@ def fit_power_law(
     else:
         uniq = np.unique(data)
         # Keep candidates that leave at least `min_tail` points in the tail.
+        # The smallest value always qualifies, because data.size >= min_tail.
         candidates = np.array([u for u in uniq if np.sum(data >= u) >= min_tail])
-        if candidates.size == 0:
-            raise InsufficientDataError("the sample has too few distinct values for a tail fit")
     best: tuple[float, float, float] | None = None
     for cand in candidates:
         tail = data[data >= cand]

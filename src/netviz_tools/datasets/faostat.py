@@ -235,7 +235,7 @@ def items(search: str | None = None) -> pd.DataFrame:
     --------
     >>> from netviz_tools.datasets import faostat
     >>> faostat.items("wheat")["item"].head(2).tolist()
-    ['Wheat', 'Flour of wheat']
+    ['Wheat', 'Wheat and meslin flour']
     """
     table = _items_table().copy()
     if search:
@@ -460,15 +460,19 @@ def build_store(
                 f"COPY ({query}) TO {_sql_str(out.as_posix())} "
                 "(FORMAT parquet, PARTITION_BY (item_code), COMPRESSION zstd)"
             )
-            glob = _sql_str((out / "*" / "*.parquet").as_posix())
-            stats = con.execute(
-                "SELECT measure, reported_by, count(*), min(year), max(year) "
-                f"FROM read_parquet({glob}, hive_partitioning = true) GROUP BY ALL ORDER BY ALL"
-            ).fetchall()
-            item_rows = con.execute(
-                "SELECT DISTINCT item_code, item "
-                f"FROM read_parquet({glob}, hive_partitioning = true) ORDER BY item_code"
-            ).fetchall()
+            out.mkdir(exist_ok=True)  # COPY writes nothing when there are no rows
+            stats: list[tuple[Any, ...]] = []
+            item_rows: list[tuple[Any, ...]] = []
+            if any(out.glob("*/*.parquet")):
+                pattern = _sql_str((out / "*" / "*.parquet").as_posix())
+                source = f"read_parquet({pattern}, hive_partitioning = true)"
+                stats = con.execute(
+                    "SELECT measure, reported_by, count(*), min(year), max(year) "
+                    f"FROM {source} GROUP BY ALL ORDER BY ALL"
+                ).fetchall()
+                item_rows = con.execute(
+                    f"SELECT DISTINCT item_code, item FROM {source} ORDER BY item_code"
+                ).fetchall()
         finally:
             con.close()
         mtime = dt.datetime.fromtimestamp(zpath.stat().st_mtime, tz=dt.UTC)
