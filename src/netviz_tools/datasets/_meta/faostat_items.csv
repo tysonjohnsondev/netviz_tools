@@ -1,0 +1,559 @@
+item_code,item,slug,cpc_code,quantity_units,first_year,last_year
+15,Wheat,wheat,0111,t,1986,2024
+16,Wheat and meslin flour,wheat_and_meslin_flour,23110,t,1986,2024
+17,Bran of wheat,bran_of_wheat,39120.01,t,1986,2024
+18,"Uncooked pasta, not stuffed or otherwise prepared",uncooked_pasta_not_stuffed_or_otherwise_prepared,23710,t,1986,2024
+19,Germ of wheat,germ_of_wheat,23140.01,t,1986,2024
+20,Bread,bread,F0020,t,1986,2024
+21,Bulgur,bulgur,23140.02,t,1986,2024
+22,Pastry,pastry,F0022,t,1986,2024
+27,Rice,rice,0113,t,1986,2024
+28,Husked rice,husked_rice,23162,t,1986,2024
+29,"Rice, milled (husked)",rice_milled_husked,23161.01,t,1986,2024
+30,"Rice, paddy (rice milled equivalent)",rice_paddy_rice_milled_equivalent,F0030,t,1986,2024
+31,"Rice, milled",rice_milled,23161.02,t,1986,2024
+32,"Rice, broken",rice_broken,23161.03,t,1986,2024
+35,Bran of rice,bran_of_rice,39120.02,t,1986,2024
+36,Oil of rice bran,oil_of_rice_bran,21691.01,t,1986,2024
+37,Cake of rice bran,cake_of_rice_bran,21910.01,t,1986,2024
+38,Flour of rice,flour_of_rice,23120.01,t,1986,2024
+39,Rice-fermented beverages,ricefermented_beverages,24230.02,t,1986,2024
+41,Breakfast cereals,breakfast_cereals,23140.03,t,1986,2024
+44,Barley,barley,0115,t,1986,2024
+45,Pot barley,pot_barley,23140.04,t,1986,2024
+46,"Barley, pearled",barley_pearled,23140.05,t,1986,2024
+47,Bran of barley,bran_of_barley,39120.03,t,1986,2024
+48,Barley flour and grits,barley_flour_and_grits,23120.02,t,1986,2024
+49,"Malt, whether or not roasted",malt_whether_or_not_roasted,24320,t,1986,2024
+50,Malt extract,malt_extract,23999.01,t,1986,2024
+51,"Beer of barley, malted",beer_of_barley_malted,24310.01,t,1986,2024
+56,Maize (corn),maize_corn,0112,t,1986,2024
+57,Germ of maize,germ_of_maize,23140.06,t,1986,2024
+58,Flour of maize,flour_of_maize,23120.03,t,1986,2024
+59,Bran of maize,bran_of_maize,39120.04,t,1986,2024
+60,Oil of maize,oil_of_maize,21691.02,t,1986,2024
+61,Cake of maize,cake_of_maize,21910.02,t,1986,2024
+71,Rye,rye,0116,t,1986,2024
+72,Flour of rye,flour_of_rye,23120.04,t,1986,2024
+73,Bran of rye,bran_of_rye,39120.05,t,1986,2024
+75,Oats,oats,0117,t,1986,2024
+76,"Oats, rolled",oats_rolled,23140.07,t,1986,2024
+77,Bran of oats,bran_of_oats,39120.06,t,1986,2021
+79,Millet,millet,0118,t,1986,2024
+80,Flour of millet,flour_of_millet,23120.05,t,1986,2024
+81,Bran of millet,bran_of_millet,39120.07,t,1990,2024
+83,Sorghum,sorghum,0114,t,1986,2024
+84,Flour of sorghum,flour_of_sorghum,23120.06,t,1986,2024
+85,Bran of sorghum,bran_of_sorghum,39120.08,t,1986,2024
+89,Buckwheat,buckwheat,01192,t,1986,2024
+90,Flour of buckwheat,flour_of_buckwheat,23120.07,t,1986,2024
+91,Bran of buckwheat,bran_of_buckwheat,39120.09,t,1987,1988
+92,Quinoa,quinoa,01194,t,1988,2024
+94,Fonio,fonio,01193,t,2012,2024
+97,Triticale,triticale,01191,t,1986,2024
+101,Canary seed,canary_seed,01195,t,1986,2024
+103,Mixed grain,mixed_grain,01199.02,t,1986,2024
+104,Flour of mixed grain,flour_of_mixed_grain,23120.10,t,1986,2024
+105,Bran of mixed grain,bran_of_mixed_grain,39120.12,t,1988,2024
+108,Cereals n.e.c.,cereals_nec,01199.90,t,1986,2024
+109,Infant food,infant_food,23991.01,t,1986,2024
+110,"Communion wafers, empty cachets of a kind suitable for pharmaceutical use, sealing wafers, rice paper and similar products.",communion_wafers_empty_cachets_of_a_kind_suitable_for_pharmaceutical_use_sealing_wafers_rice_paper_and_similar_products,23490.01,t,1986,2024
+111,Flour of cereals n.e.c.,flour_of_cereals_nec,23120.90,t,1986,2024
+112,Bran of cereals n.e.c.,bran_of_cereals_nec,39120.13,t,1986,2024
+113,Cereal preparations,cereal_preparations,23140.08,t,1986,2024
+114,Mixes and doughs for the preparation of bakers' wares,mixes_and_doughs_for_the_preparation_of_bakers_wares,23180,t,1986,2024
+115,"Food preparations of flour, meal or malt extract",food_preparations_of_flour_meal_or_malt_extract,23999.02,t,1986,2024
+116,Potatoes,potatoes,01510,t,1986,2024
+117,"Flour, meal, powder, flakes, granules and pellets of potatoes",flour_meal_powder_flakes_granules_and_pellets_of_potatoes,21392,t,1986,2024
+118,"Potatoes, frozen",potatoes_frozen,21313,t,1986,2024
+120,Potato offals,potato_offals,39130.03,t,1999,2024
+121,Tapioca of potatoes,tapioca_of_potatoes,23230.01,t,1986,2024
+122,Sweet potatoes,sweet_potatoes,01530,t,1986,2024
+125,"Cassava, fresh",cassava_fresh,01520.01,t,1986,2024
+126,Flour of cassava,flour_of_cassava,23170.01,t,1986,2024
+127,Tapioca of cassava,tapioca_of_cassava,23230.02,t,1986,2024
+128,"Cassava, dry",cassava_dry,01520.02,t,1986,2024
+129,Starch of cassava,starch_of_cassava,23220.06,t,1986,2024
+135,Yautia,yautia,01591,t,1986,2024
+136,Taro,taro,01550,t,1986,2024
+137,Yams,yams,01540,t,1986,2024
+149,"Edible roots and tubers with high starch or inulin content, n.e.c., fresh",edible_roots_and_tubers_with_high_starch_or_inulin_content_nec_fresh,01599.10,t,1986,2024
+150,Flour of roots and tubers n.e.c.,flour_of_roots_and_tubers_nec,23170.02,t,1986,2024
+151,"Edible roots and tubers with high starch or inulin content, n.e.c., dry",edible_roots_and_tubers_with_high_starch_or_inulin_content_nec_dry,01599.20,t,1989,2024
+156,Sugar cane,sugar_cane,01802,t,1986,2024
+157,Sugar beet,sugar_beet,01801,t,1986,2024
+160,"Refined cane or beet sugar, in solid form, containing added flavouring or colouring matter; maple sugar and maple syrup",refined_cane_or_beet_sugar_in_solid_form_containing_added_flavouring_or_colouring_matter_maple_sugar_and_maple_syrup,23530,t,1986,2024
+161,Other sugar crops n.e.c.,other_sugar_crops_nec,01809,t,1997,2024
+162,Raw cane or beet sugar (centrifugal only),raw_cane_or_beet_sugar_centrifugal_only,2351f,t,1986,2024
+163,"Cane sugar, non-centrifugal",cane_sugar_noncentrifugal,23511.02,t,1986,2024
+164,Refined sugar,refined_sugar,23520,t,1986,2024
+165,Molasses,molasses,23540,t,1986,2024
+166,Other fructose and syrup,other_fructose_and_syrup,23210.03,t,1986,2024
+167,Sugar and syrups n.e.c.,sugar_and_syrups_nec,23210.04,t,1986,2024
+168,Sugar confectionery,sugar_confectionery,23670.01,t,1986,2024
+169,Beet pulp,beet_pulp,39149.01,t,1986,2024
+170,Bagasse,bagasse,39141,t,1986,2024
+172,Glucose and dextrose,glucose_and_dextrose,23210.05,t,1986,2024
+173,Lactose,lactose,23210.06,t,1986,2024
+175,Isoglucose,isoglucose,23210.08,t,1986,2024
+176,"Beans, dry",beans_dry,01701,t,1986,2024
+181,"Broad beans and horse beans, dry",broad_beans_and_horse_beans_dry,01702,t,1986,2024
+187,"Peas, dry",peas_dry,01705,t,1986,2024
+191,"Chick peas, dry",chick_peas_dry,01703,t,1986,2024
+195,"Cow peas, dry",cow_peas_dry,01706,t,1986,2024
+197,"Pigeon peas, dry",pigeon_peas_dry,01707,t,1986,2024
+201,"Lentils, dry",lentils_dry,01704,t,1986,2024
+203,"Bambara beans, dry",bambara_beans_dry,01708,t,1989,2024
+205,Vetches,vetches,01709.01,t,1986,2024
+210,Lupins,lupins,01709.02,t,1986,2024
+211,Other pulses n.e.c.,other_pulses_nec,01709.90,t,1986,2024
+212,Flour of pulses,flour_of_pulses,23170.03,t,1986,2024
+213,Bran of pulses,bran_of_pulses,39120.14,t,1986,2024
+216,"Brazil nuts, in shell",brazil_nuts_in_shell,01377,t,1986,2024
+217,"Cashew nuts, in shell",cashew_nuts_in_shell,01372,t,1986,2024
+220,"Chestnuts, in shell",chestnuts_in_shell,01373,t,1986,2024
+221,"Almonds, in shell",almonds_in_shell,01371,t,1986,2024
+222,"Walnuts, in shell",walnuts_in_shell,01376,t,1986,2024
+223,"Pistachios, in shell",pistachios_in_shell,01375,t,1986,2024
+224,Kola nuts,kola_nuts,01379.02,t,1986,2024
+225,"Hazelnuts, in shell",hazelnuts_in_shell,01374,t,1986,2024
+226,Areca nuts,areca_nuts,01379.01,t,1986,2024
+229,"Brazil nuts, shelled",brazil_nuts_shelled,21429.01,t,1986,2024
+230,"Cashew nuts, shelled",cashew_nuts_shelled,21424,t,1986,2024
+231,"Almonds, shelled",almonds_shelled,21422,t,1986,2024
+232,"Walnuts, shelled",walnuts_shelled,21429.02,t,1986,2024
+233,"Hazelnuts, shelled",hazelnuts_shelled,21423,t,1986,2024
+234,"Other nuts (excluding wild edible nuts and groundnuts), in shell, n.e.c.",other_nuts_excluding_wild_edible_nuts_and_groundnuts_in_shell_nec,01379.90,t,1986,2024
+235,Prepared nuts,prepared_nuts,F0235,t,1986,2024
+236,Soya beans,soya_beans,0141,t,1986,2024
+237,Soya bean oil,soya_bean_oil,2161,t,1986,2024
+238,Cake of soya beans,cake_of_soya_beans,21910.03,t,1986,2024
+239,Soya sauce,soya_sauce,23995.01,t,1986,2024
+240,Soya paste,soya_paste,23995.02,t,1986,2024
+242,"Groundnuts, excluding shelled",groundnuts_excluding_shelled,0142,t,1986,2024
+243,"Groundnuts, shelled",groundnuts_shelled,21421,t,1986,2024
+244,Groundnut oil,groundnut_oil,2162,t,1986,2024
+245,Cake of groundnuts,cake_of_groundnuts,21910.04,t,1986,2024
+246,Prepared groundnuts,prepared_groundnuts,21495.01,t,1986,2024
+247,Peanut butter,peanut_butter,21495.02,t,1986,2024
+249,"Coconuts, in shell",coconuts_in_shell,01460,t,1986,2024
+250,"Coconuts, desiccated",coconuts_desiccated,21429.07,t,1986,2024
+251,Copra,copra,01492,t,1986,2024
+252,Coconut oil,coconut_oil,2166,t,1986,2024
+253,Cake of copra,cake_of_copra,21910.05,t,1986,2024
+256,Palm kernels,palm_kernels,01491.02,t,1986,2024
+257,Palm oil,palm_oil,2165,t,1986,2024
+258,Oil of palm kernel,oil_of_palm_kernel,21691.14,t,1986,2024
+259,Cake of palm kernel,cake_of_palm_kernel,21910.06,t,1986,2024
+260,Olives,olives,01450,t,1986,2024
+261,Olive oil,olive_oil,2167,t,1986,2024
+262,Olives preserved,olives_preserved,F0262,t,1986,2024
+263,Karite nuts (sheanuts),karite_nuts_sheanuts,01499.01,t,1986,2024
+264,Butter of karite nuts,butter_of_karite_nuts,21691.03,t,1986,2014
+265,Castor oil seeds,castor_oil_seeds,01447,t,1986,2024
+266,Oil of castor beans,oil_of_castor_beans,21691.04,t,1986,2024
+267,Sunflower seed,sunflower_seed,01445,t,1986,2024
+268,"Sunflower-seed oil, crude",sunflowerseed_oil_crude,21631.01,t,1986,2024
+269,Cake of sunflower seed,cake_of_sunflower_seed,21910.07,t,1986,2024
+270,Rape or colza seed,rape_or_colza_seed,01443,t,1986,2024
+271,"Rapeseed or canola oil, crude",rapeseed_or_canola_oil_crude,21641.01,t,1986,2024
+272,Cake of rapeseed,cake_of_rapeseed,21910.08,t,1986,2024
+273,Olive residues,olive_residues,21910.09,t,1986,2024
+274,Oil of olive residues,oil_of_olive_residues,21673,t,1986,2024
+275,Tung nuts,tung_nuts,01499.02,t,1988,2024
+276,Oil of tung nuts,oil_of_tung_nuts,21691.05,t,1986,2024
+278,Jojoba oil,jojoba_oil,21691.06,t,1986,2024
+280,Safflower seed,safflower_seed,01446,t,1986,2024
+281,"Safflower-seed oil, crude",safflowerseed_oil_crude,21631.02,t,1986,2024
+282,Cake of safflowerseed,cake_of_safflowerseed,21910.10,t,1987,2024
+289,Sesame seed,sesame_seed,01444,t,1986,2024
+290,Oil of sesame seed,oil_of_sesame_seed,21691.07,t,1986,2024
+291,Cake of sesame seed,cake_of_sesame_seed,21910.11,t,1986,2024
+292,Mustard seed,mustard_seed,01442,t,1986,2024
+293,"Mustard seed oil, crude",mustard_seed_oil_crude,21641.02,t,1986,2024
+294,Cake of mustard seed,cake_of_mustard_seed,21910.12,t,1986,2024
+295,Flour of mustard seed,flour_of_mustard_seed,23995.03,t,1986,2024
+296,Poppy seed,poppy_seed,01448,t,1986,2024
+297,Oil of poppy seed,oil_of_poppy_seed,21691.08,t,1986,1999
+299,Melonseed,melonseed,01449.01,t,1986,2024
+306,Vegetable tallow,vegetable_tallow,21691.09,t,1986,1988
+311,Kapokseed in shell,kapokseed_in_shell,01499.06,t,1986,2007
+313,Oil of kapok,oil_of_kapok,21691.11,t,1986,2004
+314,Cake of kapok,cake_of_kapok,21910.14,t,1986,2006
+329,Cotton seed,cotton_seed,0143,t,1986,2024
+331,Cottonseed oil,cottonseed_oil,2168,t,1986,2024
+332,Cake of cottonseed,cake_of_cottonseed,21910.15,t,1986,2024
+333,Linseed,linseed,01441,t,1986,2024
+334,Oil of linseed,oil_of_linseed,21691.12,t,1986,2024
+335,Cake of linseed,cake_of_linseed,21910.16,t,1986,2024
+336,Hempseed,hempseed,01449.02,t,1986,2024
+338,Cake of hempseed,cake_of_hempseed,21910.17,t,1998,1998
+339,"Other oil seeds, n.e.c.",other_oil_seeds_nec,01449.90,t,1986,2024
+340,"Other oil of vegetable origin, crude n.e.c.",other_oil_of_vegetable_origin_crude_nec,21691.90,t,1986,2024
+341,"Cake, oilseeds nes",cake_oilseeds_nes,21910.90,t,1986,2024
+343,"Flours and meals of oil seeds or oleaginous fruits, except those of mustard",flours_and_meals_of_oil_seeds_or_oleaginous_fruits_except_those_of_mustard,21920,t,1986,2024
+358,Cabbages,cabbages,01212,t,1986,2024
+366,Artichokes,artichokes,01216,t,1986,2024
+367,Asparagus,asparagus,01211,t,1986,2024
+372,Lettuce and chicory,lettuce_and_chicory,01214,t,1986,2024
+373,Spinach,spinach,01215,t,1986,2024
+388,Tomatoes,tomatoes,01234,t,1986,2024
+390,Tomato juice,tomato_juice,21321,t,1986,2024
+391,Paste of tomatoes,paste_of_tomatoes,21399.01,t,1986,2024
+392,"Tomatoes, peeled (o/t vinegar)",tomatoes_peeled_ot_vinegar,21399.02,t,1986,2024
+393,Cauliflowers and broccoli,cauliflowers_and_broccoli,01213,t,1986,2024
+394,"Pumpkins, squash and gourds",pumpkins_squash_and_gourds,01235,t,1986,2024
+397,Cucumbers and gherkins,cucumbers_and_gherkins,01232,t,1986,2024
+399,Eggplants (aubergines),eggplants_aubergines,01233,t,1986,2024
+401,"Chillies and peppers, green (Capsicum spp. and Pimenta spp.)",chillies_and_peppers_green_capsicum_spp_and_pimenta_spp,01231,t,1986,2024
+402,"Onions and shallots, green",onions_and_shallots_green,01253.01,t,1986,2024
+403,"Onions and shallots, dry (excluding dehydrated)",onions_and_shallots_dry_excluding_dehydrated,01253.02,t,1986,2024
+406,Green garlic,green_garlic,01252,t,1986,2024
+407,Leeks and other alliaceous vegetables,leeks_and_other_alliaceous_vegetables,01254,t,1986,2024
+414,"Other beans, green",other_beans_green,01241.90,t,1986,2024
+417,"Peas, green",peas_green,01242,t,1986,2024
+420,"Broad beans and horse beans, green",broad_beans_and_horse_beans_green,01243,t,1986,2024
+423,String beans,string_beans,01241.01,t,1986,2024
+426,Carrots and turnips,carrots_and_turnips,01251,t,1986,2024
+430,Okra,okra,01239.01,t,1986,2024
+446,Green corn (maize),green_corn_maize,01290.01,t,1986,2024
+447,"Sweet corn, frozen",sweet_corn_frozen,21319.01,t,1986,2024
+448,"Sweet corn, prepared or preserved",sweet_corn_prepared_or_preserved,21399.03,t,1986,2024
+449,Mushrooms and truffles,mushrooms_and_truffles,01270,t,1986,2024
+450,Dried mushrooms,dried_mushrooms,21393.01,t,1986,2024
+451,Canned mushrooms,canned_mushrooms,21397.01,t,1986,2024
+459,Chicory roots,chicory_roots,01691,t,1986,2024
+460,"Vegetable products, fresh or dry n.e.c.",vegetable_products_fresh_or_dry_nec,01990.01,t,1986,2024
+461,Locust beans (carobs),locust_beans_carobs,01356,t,1986,2024
+463,"Other vegetables, fresh n.e.c.",other_vegetables_fresh_nec,01290.90,t,1986,2024
+465,"Other vegetables and pulses, preserved other than by vinegar, acetic acid or sugar, n.e.c.",other_vegetables_and_pulses_preserved_other_than_by_vinegar_acetic_acid_or_sugar_nec,21399,t,1986,1991
+466,Other vegetable juices,other_vegetable_juices,21329,t,1986,2024
+469,"Vegetables, dehydrated",vegetables_dehydrated,21393.90,t,1986,2024
+471,"Vegetables, pulses and potatoes, preserved by vinegar or acetic acid",vegetables_pulses_and_potatoes_preserved_by_vinegar_or_acetic_acid,21340,t,1986,2024
+472,Vegetables preserved nes (o/t vinegar),vegetables_preserved_nes_ot_vinegar,F0472,t,1986,2024
+473,Vegetables frozen,vegetables_frozen,F0473,t,1986,2024
+474,Other vegetables provisionally preserved,other_vegetables_provisionally_preserved,21330.90,t,1986,2024
+475,Vegetables preserved (frozen),vegetables_preserved_frozen,F0475,t,1987,2024
+476,Homogenized vegetable preparations,homogenized_vegetable_preparations,23991.02,t,1988,2024
+486,Bananas,bananas,01312,t,1986,2024
+489,Plantains and cooking bananas,plantains_and_cooking_bananas,01313,t,1986,2024
+490,Oranges,oranges,01323,t,1986,2024
+491,Orange juice,orange_juice,21431.01,t,1986,2024
+492,"Orange juice, concentrated",orange_juice_concentrated,21431.02,t,1986,2024
+495,"Tangerines, mandarins, clementines",tangerines_mandarins_clementines,01324,t,1986,2024
+496,Juice of tangerine,juice_of_tangerine,21439.01,t,1986,2024
+497,Lemons and limes,lemons_and_limes,01322,t,1986,2024
+498,Juice of lemon,juice_of_lemon,21439.02,t,1986,2024
+499,"Lemon juice, concentrated",lemon_juice_concentrated,21439.03,t,1986,2024
+507,Pomelos and grapefruits,pomelos_and_grapefruits,01321,t,1986,2024
+509,Grapefruit juice,grapefruit_juice,21432,t,1986,2024
+510,"Grapefruit juice, concentrated",grapefruit_juice_concentrated,21432.01,t,1986,2024
+512,"Other citrus fruit, n.e.c.",other_citrus_fruit_nec,01329,t,1986,2024
+513,Juice of citrus fruit n.e.c.,juice_of_citrus_fruit_nec,21439.04,t,1986,2024
+514,"Citrus juice, concentrated n.e.c.",citrus_juice_concentrated_nec,21439.05,t,1986,2024
+515,Apples,apples,01341,t,1986,2024
+517,Cider and other fermented beverages,cider_and_other_fermented_beverages,24230.03,t,1986,2024
+518,Apple juice,apple_juice,21435.01,t,1986,2024
+519,"Apple juice, concentrated",apple_juice_concentrated,21435.02,t,1986,2024
+521,Pears,pears,01342.01,t,1986,2024
+523,Quinces,quinces,01342.02,t,1986,2024
+526,Apricots,apricots,01343,t,1986,2024
+527,"Apricots, dried",apricots_dried,21419.01,t,1986,2024
+530,Sour cherries,sour_cherries,01344.01,t,1986,2024
+531,Cherries,cherries,01344.02,t,1986,2024
+534,Peaches and nectarines,peaches_and_nectarines,01345,t,1986,2024
+536,Plums and sloes,plums_and_sloes,01346,t,1986,2024
+537,"Plums, dried",plums_dried,21412,t,1986,2024
+539,"Juice of plum, concentrated",juice_of_plum_concentrated,21439.07,t,1986,1987
+541,Other stone fruits,other_stone_fruits,01349.20,t,1986,2024
+544,Strawberries,strawberries,01354,t,1986,2024
+547,Raspberries,raspberries,01353.01,t,1986,2024
+549,Gooseberries,gooseberries,01351.02,t,1986,2024
+550,Currants,currants,01351.01,t,1986,2024
+552,Blueberries,blueberries,01355.01,t,1986,2024
+554,Cranberries,cranberries,01355.02,t,1986,2024
+558,Other berries and fruits of the genus vaccinium n.e.c.,other_berries_and_fruits_of_the_genus_vaccinium_nec,01355.90,t,1986,2024
+560,Grapes,grapes,01330,t,1986,2024
+561,Raisins,raisins,21411,t,1986,2024
+562,Grape juice,grape_juice,21434,t,1986,2024
+563,Must of grape,must_of_grape,24212.01,t,1986,2024
+564,Wine,wine,24212.02,t,1986,2024
+565,Vermouth and other wine of fresh grapes flavoured with plats or aromatic substances,vermouth_and_other_wine_of_fresh_grapes_flavoured_with_plats_or_aromatic_substances,24220,t,1986,2024
+566,"Grapes, marc",grapes_marc,39120.18,t,1986,2024
+567,Watermelons,watermelons,01221,t,1986,2024
+568,Cantaloupes and other melons,cantaloupes_and_other_melons,01229,t,1986,2024
+569,Figs,figs,01315,t,1986,2024
+570,"Figs, dried",figs_dried,21419.02,t,1986,2024
+571,"Mangoes, guavas and mangosteens",mangoes_guavas_and_mangosteens,01316,t,1986,2024
+572,Avocados,avocados,01311,t,1986,2024
+574,Pineapples,pineapples,01318,t,1986,2024
+575,"Pineapples, otherwise prepared or preserved",pineapples_otherwise_prepared_or_preserved,21491,t,1986,2024
+576,Pineapple juice,pineapple_juice,21433,t,1986,2024
+577,Dates,dates,01314,t,1986,2024
+580,"Juice of pineapples, concentrated",juice_of_pineapples_concentrated,21433.01,t,1986,2024
+583,Juice of mango,juice_of_mango,21439.08,t,1986,2024
+584,Mango pulp,mango_pulp,21499.01,t,1986,2024
+587,Persimmons,persimmons,01359.01,t,1986,2024
+591,Cashewapple,cashewapple,01359.02,t,1986,2024
+592,Kiwi fruit,kiwi_fruit,01352,t,1986,2024
+600,Papayas,papayas,01317,t,1986,2024
+603,"Other tropical fruits, n.e.c.",other_tropical_fruits_nec,01319,t,1986,2024
+604,"Other tropical fruit, dried",other_tropical_fruit_dried,21419.91,t,1986,2024
+619,"Other fruits, n.e.c.",other_fruits_nec,01359.90,t,1986,2024
+620,"Other fruit n.e.c., dried",other_fruit_nec_dried,21419.99,t,1986,2024
+622,Juice of fruits n.e.c.,juice_of_fruits_nec,21439.90,t,1986,2024
+623,Fruit prepared n.e.c.,fruit_prepared_nec,F0623,t,1986,2024
+624,Flour of fruits,flour_of_fruits,23170.04,t,1986,2024
+625,"Fruit, nuts, peel, sugar preserved",fruit_nuts_peel_sugar_preserved,23670.02,t,1986,2024
+626,"Homogenized cooked fruit, prepared",homogenized_cooked_fruit_prepared,23991.03,t,1986,2024
+628,"Pulp, waste of fruit for feed",pulp_waste_of_fruit_for_feed,39120.15,t,1986,2024
+630,Cane tops,cane_tops,39120.17,t,1991,1997
+633,Other non-alcoholic caloric beverages,other_nonalcoholic_caloric_beverages,24490,t,1986,2024
+634,"Undenatured ethyl alcohol of an alcoholic strength by volume of less than 80% vol; spirits, liqueurs and other spirituous beverages",undenatured_ethyl_alcohol_of_an_alcoholic_strength_by_volume_of_less_than_80_vol_spirits_liqueurs_and_other_spirituous_beverages,2413,t,1986,2024
+635,"Cereal straw, husks, unprepared, ground, pressed, or in the form of pellets",cereal_straw_husks_unprepared_ground_pressed_or_in_the_form_of_pellets,01913,t,1986,2024
+636,"Forage and silage, maize",forage_and_silage_maize,01911,t,1986,2024
+641,"Forage and silage, alfalfa",forage_and_silage_alfalfa,01912,t,1986,2024
+646,"Turnips, for forage",turnips_for_forage,01919.05,t,1992,1995
+647,Beets for fodder,beets_for_fodder,01919.06,t,1986,2024
+649,Swedes for fodder,swedes_for_fodder,01919.08,t,1986,2024
+651,"Other forage products, n.e.c.",other_forage_products_nec,01919.96,t,1986,2024
+652,Vegetable products for feed n.e.c.,vegetable_products_for_feed_nec,39120.91,t,1986,2024
+653,Food wastes,food_wastes,39170.01,t,1986,2024
+654,Brewing or distilling dregs and waste,brewing_or_distilling_dregs_and_waste,39160,t,1986,2024
+655,Vegetables and roots fodder,vegetables_and_roots_fodder,01919.95,t,1986,2024
+656,"Coffee, green",coffee_green,01610,t,1986,2024
+657,"Coffee, decaffeinated or roasted",coffee_decaffeinated_or_roasted,23911,t,1986,2024
+658,Coffee substitutes,coffee_substitutes,23912.01,t,1986,2024
+659,Coffee extracts,coffee_extracts,23912.02,t,1986,2024
+660,Coffee husks and skins,coffee_husks_and_skins,39150.01,t,1986,2024
+661,Cocoa beans,cocoa_beans,01640,t,1986,2024
+662,Cocoa paste not defatted,cocoa_paste_not_defatted,23610.01,t,1986,2024
+663,Cocoa husks and shells,cocoa_husks_and_shells,39150.02,t,1986,2024
+664,"Cocoa butter, fat and oil",cocoa_butter_fat_and_oil,23620,t,1986,2024
+665,Cocoa powder and cake,cocoa_powder_and_cake,F0665,t,1986,2024
+666,Chocolate products nes,chocolate_products_nes,F0666,t,1986,2024
+667,Tea leaves,tea_leaves,01620,t,1986,2024
+671,Maté leaves,mate_leaves,01630,t,1986,2024
+672,"Extracts, essences and concentrates of tea or mate, and preparations with a basis thereof or with a basis of tea or maté",extracts_essences_and_concentrates_of_tea_or_mate_and_preparations_with_a_basis_thereof_or_with_a_basis_of_tea_or_mate,23914,t,1986,2024
+677,Hop cones,hop_cones,01659,t,1986,2024
+687,"Pepper (Piper spp.), raw",pepper_piper_spp_raw,01651,t,1986,2024
+689,"Chillies and peppers, dry (Capsicum spp., Pimenta spp.), raw",chillies_and_peppers_dry_capsicum_spp_pimenta_spp_raw,01652,t,1986,2024
+692,"Vanilla, raw",vanilla_raw,01658,t,1986,2024
+693,"Cinnamon and cinnamon-tree flowers, raw",cinnamon_and_cinnamontree_flowers_raw,01655,t,1986,2024
+698,"Cloves (whole stems), raw",cloves_whole_stems_raw,01656,t,1986,2024
+702,"Nutmeg, mace, cardamoms, raw",nutmeg_mace_cardamoms_raw,01653,t,1986,2024
+711,"Anise, badian, coriander, cumin, caraway, fennel and juniper berries, raw",anise_badian_coriander_cumin_caraway_fennel_and_juniper_berries_raw,01654,t,1986,2024
+720,"Ginger, raw",ginger_raw,01657,t,1986,2024
+723,"Other stimulant, spice and aromatic crops, n.e.c.",other_stimulant_spice_and_aromatic_crops_nec,01699,t,1986,2024
+737,Oil of citronella,oil_of_citronella,35410.01,t,1986,2024
+748,"Peppermint, spearmint",peppermint_spearmint,01930.01,t,1986,2024
+753,Essential oils n.e.c.,essential_oils_nec,35410.90,t,1986,2024
+754,"Pyrethrum, dried flowers",pyrethrum_dried_flowers,01930.02,t,1986,2024
+755,Pyrethrum extract,pyrethrum_extract,23999.04,t,1986,2024
+767,"Cotton lint, ginned",cotton_lint_ginned,01921.02,t,1986,2024
+768,"Cotton, carded or combed",cotton_carded_or_combed,26160,t,1986,2024
+769,Cotton waste,cotton_waste,F0769,t,1986,2024
+770,Cotton linters,cotton_linters,21800,t,1986,2024
+771,"Flax, raw or retted",flax_raw_or_retted,01929.01,t,1986,2024
+773,"Flax, processed but not spun",flax_processed_but_not_spun,26190.01,t,1986,2024
+774,"Flax, tow and waste",flax_tow_and_waste,26190.02,t,1986,2024
+777,"True hemp, raw or retted",true_hemp_raw_or_retted,01929.02,t,1986,2024
+778,"Kapok fibre, raw",kapok_fibre_raw,01929.03,t,1986,2005
+780,"Jute, raw or retted",jute_raw_or_retted,01922.01,t,1986,2024
+782,"Kenaf, and other textile bast fibres, raw or retted",kenaf_and_other_textile_bast_fibres_raw_or_retted,01922.02,t,1986,2024
+788,"Ramie, raw or retted",ramie_raw_or_retted,01929.04,t,1986,2019
+789,"Sisal, raw",sisal_raw,01929.05,t,1986,2023
+809,"Abaca, manila hemp, raw",abaca_manila_hemp_raw,01929.07,t,1986,2024
+813,"Coir, raw",coir_raw,01929.08,t,1986,2024
+821,"Other fibre crops, raw, n.e.c.",other_fibre_crops_raw_nec,01929.90,t,1986,2024
+826,Unmanufactured tobacco,unmanufactured_tobacco,01970,t,1986,2024
+828,Cigarettes,cigarettes,25020.01,t,1986,2024
+829,Cigars and cheroots,cigars_and_cheroots,25020.02,t,1986,2024
+831,Other manufactured tobacco and manufactured tobacco substitutes; 'homogenized' or 'reconstituted' tobacco; tobacco extracts and essences,other_manufactured_tobacco_and_manufactured_tobacco_substitutes_homogenized_or_reconstituted_tobacco_tobacco_extracts_and_essences,25090,t,1986,2024
+836,Natural rubber in primary forms,natural_rubber_in_primary_forms,01950.01,t,1986,2024
+837,Natural rubber in other forms,natural_rubber_in_other_forms,01950.02,t,1986,2024
+839,"Balata, gutta-percha, guayule, chicle and similar natural gums in primary forms or in plates, sheets or strip",balata_guttapercha_guayule_chicle_and_similar_natural_gums_in_primary_forms_or_in_plates_sheets_or_strip,03211,t,1986,2024
+840,"Feed, compound, cattle",feed_compound_cattle,23319.01,t,1986,2024
+841,"Feed, compound, poultry",feed_compound_poultry,23319.02,t,1986,2024
+842,"Feed, compound, pigs",feed_compound_pigs,23319.03,t,1986,2024
+843,"Dog or cat food, put up for retail sale",dog_or_cat_food_put_up_for_retail_sale,23311,t,1986,2024
+845,Compound feed n.e.c.,compound_feed_nec,23319.04,t,1986,2024
+846,Gluten feed and meal,gluten_feed_and_meal,39130.04,t,1986,2024
+850,Feed supplements,feed_supplements,23319.06,t,1986,2024
+852,"Feed, other concentrates nes",feed_other_concentrates_nes,23319.08,t,1986,2024
+853,Vitamins,vitamins,23319.09,t,1986,2015
+854,Feed additives,feed_additives,23319.10,t,1986,2005
+855,Feed minerals,feed_minerals,23319.11,t,1986,1991
+857,"Hay, non-leguminous",hay_nonleguminous,01919.09,t,1986,2024
+858,"Hay for forage, from legumes",hay_for_forage_from_legumes,01919.10,t,1987,1996
+859,"Hay for forage, from other crops n.e.c.",hay_for_forage_from_other_crops_nec,01919.11,t,1986,2024
+862,Lucerne (alfalfa) meal and pellets,lucerne_alfalfa_meal_and_pellets,23320,t,1986,2024
+866,Cattle,cattle,02111,An|t,1986,2024
+867,"Meat of cattle with the bone, fresh or chilled",meat_of_cattle_with_the_bone_fresh_or_chilled,21111.01,t,1986,2024
+868,"Edible offal of cattle, fresh, chilled or frozen",edible_offal_of_cattle_fresh_chilled_or_frozen,21151,t,1986,2024
+869,"Cattle fat, unrendered",cattle_fat_unrendered,21512,t,1986,2024
+870,"Meat of cattle boneless, fresh or chilled",meat_of_cattle_boneless_fresh_or_chilled,21111.02,t,1986,2024
+871,"Cattle, butcher fat",cattle_butcher_fat,21512.01,t,2000,2024
+872,"Bovine meat, salted, dried or smoked",bovine_meat_salted_dried_or_smoked,21182,t,1986,2024
+873,"Extracts and juices of meat, fish, crustaceans, molluscs or other aquatic invertebrates",extracts_and_juices_of_meat_fish_crustaceans_molluscs_or_other_aquatic_invertebrates,21185,t,1986,2024
+874,"Sausages and similar products of meat, offal or blood of beef and veal",sausages_and_similar_products_of_meat_offal_or_blood_of_beef_and_veal,21184.01,t,1986,2024
+875,Beef and veal preparations nes,beef_and_veal_preparations_nes,F0875,t,1986,2024
+877,Homogenized meat preparations,homogenized_meat_preparations,23991.04,t,1988,2024
+878,Liver preparations,liver_preparations,21189.01,t,1986,2024
+882,Raw milk of cattle,raw_milk_of_cattle,02211,t,1986,2024
+885,"Cream, fresh",cream_fresh,22120,t,1986,2024
+886,Butter of cow milk,butter_of_cow_milk,22241.01,t,1986,2024
+887,Ghee from cow milk,ghee_from_cow_milk,22241.02,t,1986,2024
+888,Skim milk of cows,skim_milk_of_cows,22110.02,t,1986,2024
+889,"Whole milk, condensed",whole_milk_condensed,22222.01,t,1986,2024
+890,"Whey, condensed",whey_condensed,22130.03,t,1986,2024
+891,Yoghurt,yoghurt,22230.01,t,1986,2024
+892,"Yoghurt, with additives",yoghurt_with_additives,22230.02,t,1988,2024
+893,"Buttermilk, curdled and acidified milk",buttermilk_curdled_and_acidified_milk,22230.03,t,1987,2024
+894,"Whole milk, evaporated",whole_milk_evaporated,22221.01,t,1986,2024
+895,"Skim milk, evaporated",skim_milk_evaporated,22221.02,t,1986,2024
+896,"Skim milk, condensed",skim_milk_condensed,22222.02,t,1986,2024
+897,Whole milk powder,whole_milk_powder,22211,t,1986,2024
+898,Skim milk and whey powder,skim_milk_and_whey_powder,22212,t,1986,2024
+899,"Buttermilk, dry",buttermilk_dry,22230.04,t,1986,2024
+900,"Whey, dry",whey_dry,22130.02,t,1986,2024
+901,Cheese from whole cow milk,cheese_from_whole_cow_milk,22251.01,t,1986,2024
+903,"Whey, fresh",whey_fresh,22130.01,t,1986,2024
+904,Cheese from skimmed cow milk,cheese_from_skimmed_cow_milk,22251.02,t,1986,2024
+905,Whey cheese,whey_cheese,22251.03,t,1986,2024
+907,Processed cheese,processed_cheese,22251.04,t,1986,2024
+909,Dairy products n.e.c.,dairy_products_nec,22290,t,1988,2024
+910,Ice cream and other edible ice,ice_cream_and_other_edible_ice,22270,t,1986,2024
+919,Raw hides and skins of cattle,raw_hides_and_skins_of_cattle,02951.01,t,2020,2024
+920,"Hides, wet-salted of cattle",hides_wetsalted_of_cattle,02951.04,t,1986,2024
+921,"Hides, cattle, dry salted",hides_cattle_dry_salted,02951.05,t,1986,2024
+922,"Hides, cattle nes",hides_cattle_nes,02951.91,t,1986,2024
+928,"Skins, wet-salted of calves",skins_wetsalted_of_calves,02951.06,t,1986,2024
+929,"Skins, calve, dry salted",skins_calve_dry_salted,02951.07,t,1986,2024
+930,"Skins, calve nes",skins_calve_nes,02951.92,t,1986,2024
+946,Buffalo,buffalo,02112,An|t,1986,2024
+947,"Meat of buffalo, fresh or chilled",meat_of_buffalo_fresh_or_chilled,21112,t,1986,2024
+948,"Edible offal of buffalo, fresh, chilled or frozen",edible_offal_of_buffalo_fresh_chilled_or_frozen,21152,t,2008,2024
+953,Ghee from buffalo milk,ghee_from_buffalo_milk,22242.02,t,1999,1999
+958,"Hides, wet-salted of buffalo",hides_wetsalted_of_buffalo,02951.08,t,1986,2002
+959,"Hides, dry-salted of buffalo",hides_drysalted_of_buffalo,02951.09,t,1986,2007
+976,Sheep,sheep,02122,An|t,1986,2024
+977,"Meat of sheep, fresh or chilled",meat_of_sheep_fresh_or_chilled,21115,t,1986,2024
+978,"Edible offal of sheep, fresh, chilled or frozen",edible_offal_of_sheep_fresh_chilled_or_frozen,21155,t,1986,2024
+979,"Sheep fat, unrendered",sheep_fat_unrendered,21514,t,1986,2024
+982,Raw milk of sheep,raw_milk_of_sheep,02291,t,1990,1999
+983,Butter and ghee of sheep milk,butter_and_ghee_of_sheep_milk,22249.01,t,1986,2019
+984,"Cheese from milk of sheep, fresh or processed",cheese_from_milk_of_sheep_fresh_or_processed,22253,t,1986,2024
+987,"Shorn wool, greasy, including fleece-washed shorn wool",shorn_wool_greasy_including_fleecewashed_shorn_wool,02941,t,1986,2024
+988,"Wool, degreased or carbonized, not carded or combed",wool_degreased_or_carbonized_not_carded_or_combed,26130,t,1986,2024
+994,Wool grease and lanolin,wool_grease_and_lanolin,F0994,t,1986,2024
+996,"Skins, wet-salted of sheep",skins_wetsalted_of_sheep,02953.03,t,1986,2024
+997,"Skins, dry-salted of sheep",skins_drysalted_of_sheep,02953.04,t,1986,2024
+998,"Skins, sheep nes",skins_sheep_nes,02953.90,t,1986,2024
+999,"Raw hides and skins of sheep or lambs, with wool",raw_hides_and_skins_of_sheep_or_lambs_with_wool,02953.01,t,1986,2024
+1002,"Skins, karakul",skins_karakul,02955.01,t,1986,2024
+1007,"Wool, shoddy",wool_shoddy,39213,t,1986,2024
+1008,"Hair, carded/combed",hair_cardedcombed,26150.01,t,1986,2024
+1009,"Wool, hair waste",wool_hair_waste,F1009,t,1986,2024
+1016,Goats,goats,02123,An|t,1986,2024
+1017,"Meat of goat, fresh or chilled",meat_of_goat_fresh_or_chilled,21116,t,1986,2024
+1018,"Edible offal of goat, fresh, chilled or frozen",edible_offal_of_goat_fresh_chilled_or_frozen,21156,t,1986,2024
+1021,"Cheese from milk of goats, fresh or processed",cheese_from_milk_of_goats_fresh_or_processed,22254,t,1986,2024
+1022,Butter of goat milk,butter_of_goat_milk,22249.02,t,2002,2024
+1026,"Skins, wet-salted of goats",skins_wetsalted_of_goats,02954.01,t,1986,2015
+1027,"Skins, goat, dry salted",skins_goat_dry_salted,02954.02,t,1986,2018
+1028,"Skins, goat nes",skins_goat_nes,02954.90,t,1986,2019
+1030,"Hair, goat, fine",hair_goat_fine,02943.01,t,1986,2024
+1031,Coarse goat hair,coarse_goat_hair,02942.02,t,1986,2024
+1034,Swine / pigs,swine_pigs,02140,An|t,1986,2024
+1035,"Meat of pig with the bone, fresh or chilled",meat_of_pig_with_the_bone_fresh_or_chilled,21113.01,t,1986,2024
+1036,"Edible offal of pigs, fresh, chilled or frozen",edible_offal_of_pigs_fresh_chilled_or_frozen,21153,t,1986,2024
+1037,Fat of pigs,fat_of_pigs,21511.01,t,1986,2024
+1038,"Meat of pig boneless, fresh or chilled",meat_of_pig_boneless_fresh_or_chilled,21113.02,t,1986,2024
+1039,"Pig meat, cuts, salted, dried or smoked (bacon and ham)",pig_meat_cuts_salted_dried_or_smoked_bacon_and_ham,21181,t,1986,2024
+1040,"Pig, butcher fat",pig_butcher_fat,21511.02,t,1990,2024
+1041,"Sausages and similar products of meat, offal or blood of pig",sausages_and_similar_products_of_meat_offal_or_blood_of_pig,21184.02,t,1986,2024
+1042,Pig meat preparations,pig_meat_preparations,F1042,t,1986,2024
+1043,"Pig fat, rendered",pig_fat_rendered,21521,t,1986,2024
+1045,"Skins, pig, wet salted",skins_pig_wet_salted,02959.03,t,1986,2024
+1046,"Skins, pig, dry salted",skins_pig_dry_salted,02959.04,t,1986,2019
+1047,"Skins, pig nes",skins_pig_nes,02959.05,t,1986,2024
+1057,Chickens,chickens,02151,1000 An|t,1986,2024
+1058,"Meat of chickens, fresh or chilled",meat_of_chickens_fresh_or_chilled,21121,t,1986,2024
+1059,"Edible offals and liver of chickens and guinea fowl, fresh, chilled or frozen",edible_offals_and_liver_of_chickens_and_guinea_fowl_fresh_chilled_or_frozen,21160.01,t,1986,2024
+1060,Fatty liver preparations,fatty_liver_preparations,21189.02,t,1986,2024
+1061,Poultry meat preparations,poultry_meat_preparations,F1061,t,1986,2024
+1062,"Hen eggs in shell, fresh",hen_eggs_in_shell_fresh,0231,t,1986,2024
+1063,"Eggs, liquid",eggs_liquid,23993.02,t,1986,2024
+1064,"Eggs, dried",eggs_dried,23993.03,t,1986,2024
+1065,Fat of poultry,fat_of_poultry,21511.03,t,1986,2024
+1066,"Poultry fat, rendered",poultry_fat_rendered,21522,t,1986,2024
+1068,Ducks,ducks,02154,1000 An|t,1986,2024
+1069,"Meat of ducks, fresh or chilled",meat_of_ducks_fresh_or_chilled,21122,t,1986,2024
+1072,Geese,geese,02153,1000 An|t,1986,2024
+1073,"Meat of geese, fresh or chilled",meat_of_geese_fresh_or_chilled,21123,t,1986,2024
+1074,"Edible offals and liver of geese, fresh, chilled or frozen",edible_offals_and_liver_of_geese_fresh_chilled_or_frozen,21160.02,t,1986,2024
+1075,"Edible offals and liver of ducks, fresh, chilled or frozen",edible_offals_and_liver_of_ducks_fresh_chilled_or_frozen,21160.03,t,1986,2024
+1079,Turkeys,turkeys,02152,1000 An|t,1986,2024
+1080,"Meat of turkeys, fresh or chilled",meat_of_turkeys_fresh_or_chilled,21124,t,1986,2024
+1081,"Edible offals and liver of turkey, fresh, chilled or frozen",edible_offals_and_liver_of_turkey_fresh_chilled_or_frozen,21160.04,t,1991,2024
+1083,Other birds,other_birds,02194,1000 An|t,1986,2024
+1089,"Meat of pigeons and other birds n.e.c., fresh, chilled or frozen",meat_of_pigeons_and_other_birds_nec_fresh_chilled_or_frozen,21170.01,t,1986,2024
+1091,"Eggs from other birds in shell, fresh, n.e.c.",eggs_from_other_birds_in_shell_fresh_nec,0232,t,1986,2024
+1096,Horses,horses,02131,An|t,1986,2024
+1097,"Horse meat, fresh or chilled",horse_meat_fresh_or_chilled,21118.01,t,1986,2024
+1098,"Edible offals of horses and other equines, fresh, chilled or frozen",edible_offals_of_horses_and_other_equines_fresh_chilled_or_frozen,21159.01,t,1986,2024
+1100,"Hair, horse",hair_horse,39110.01,t,1986,2024
+1103,"Hides, horse, wet salted",hides_horse_wet_salted,02952.04,t,1986,2024
+1104,"Hides, dry-salted of horses",hides_drysalted_of_horses,02952.05,t,1986,2016
+1105,"Hides, horse nes",hides_horse_nes,02952.91,t,1986,2023
+1107,Asses,asses,02132,An|t,1986,2024
+1108,"Meat of asses, fresh or chilled",meat_of_asses_fresh_or_chilled,21118.02,t,1987,1987
+1110,Mules and hinnies,mules_and_hinnies,02133,An|t,1986,2024
+1126,Camels,camels,02121.01,An|t,1986,2024
+1127,"Meat of camels, fresh or chilled",meat_of_camels_fresh_or_chilled,21117.01,t,1986,2024
+1129,Fat of camels,fat_of_camels,21519.02,t,1999,2023
+1134,"Hides, wet-salted of camels",hides_wetsalted_of_camels,02959.06,t,1987,1987
+1140,Rabbits and hares,rabbits_and_hares,02191,1000 An|t,1986,2024
+1141,"Meat of rabbits and hares, fresh or chilled",meat_of_rabbits_and_hares_fresh_or_chilled,21114,t,1986,2024
+1146,"Skins, rabbit",skins_rabbit,02955.02,t,1986,2024
+1150,Other rodents,other_rodents,02192.01,1000 An|An|t,1987,2024
+1157,Other camelids,other_camelids,02121.02,An|t,1987,2024
+1163,"Game meat, fresh, chilled or frozen",game_meat_fresh_chilled_or_frozen,21170.02,t,1986,2024
+1164,"Other meat and edible meat offal, salted, in brine, dried or smoked; edible flours and meals of meat or meat offal",other_meat_and_edible_meat_offal_salted_in_brine_dried_or_smoked_edible_flours_and_meals_of_meat_or_meat_offal,21183,t,1986,2024
+1166,"Other meat of mammals, fresh or chilled",other_meat_of_mammals_fresh_or_chilled,21119.90,t,1986,2024
+1167,"Offals n.e.c. (excluding mammals), fresh, chilled or frozen",offals_nec_excluding_mammals_fresh_chilled_or_frozen,21170.93,t,1986,2024
+1168,Animal oils and fats n.e.c.,animal_oils_and_fats_nec,21529.03,t,1986,2024
+1169,"Other live animals non food, n.e.c.",other_live_animals_non_food_nec,02199.10,,1986,2024
+1171,"Other live animals, n.e.c.",other_live_animals_nec,02199.20,An,1986,2024
+1172,Meat prepared n.e.c.,meat_prepared_nec,F1172,t,1986,2024
+1173,Meat meal,meat_meal,21190.01,t,1986,2024
+1181,Bees,bees,02196,No,1986,2024
+1182,Natural honey,natural_honey,02910,t,1986,2024
+1183,Beeswax,beeswax,02960.01,t,1986,2024
+1185,Silk-worm cocoons suitable for reeling,silkworm_cocoons_suitable_for_reeling,02944,t,1986,2024
+1186,Raw silk (not thrown),raw_silk_not_thrown,26110,t,1986,2024
+1187,Silk waste,silk_waste,39211,t,1986,2024
+1195,"Skins, furs",skins_furs,02955.90,t,1986,2024
+1213,"Other raw skins of other animals, fresh",other_raw_skins_of_other_animals_fresh,02959.91,t,1986,1992
+1214,"Hides, wet salted nes",hides_wet_salted_nes,02959.20,t,1986,2024
+1215,"Hides nes, dry salted",hides_nes_dry_salted,02959.30,t,1986,2024
+1216,"Other raw skins of other animals, preserved",other_raw_skins_of_other_animals_preserved,02959.99,t,1986,2024
+1217,Leather used & waste,leather_used_waste,F1217,t,1986,2024
+1218,"Fine animal hair, n.e.c.",fine_animal_hair_nec,02943.90,t,1986,2024
+1219,"Hair, coarse nes",hair_coarse_nes,02942.90,t,1986,2024
+1221,Lard stearine and lard oil,lard_stearine_and_lard_oil,21529.02,t,1986,2024
+1222,Degras,degras,21932.01,t,1986,2024
+1225,Tallow,tallow,21523,t,1986,2024
+1232,Food preparations n.e.c.,food_preparations_nec,F1232,t,1986,2024
+1241,Liquid margarine,liquid_margarine,21700.01,t,1986,2024
+1242,Margarine and shortening,margarine_and_shortening,21700.02,t,1986,2024
+1243,Fat preparations n.e.c.,fat_preparations_nec,F1243,t,1986,2024
+1259,"Feed, food waste preparations",feed_food_waste_preparations,39170.02,t,1986,2024
+1274,"Animal or vegetable fats and oils and their fractions, chemically modified, except those hydrogenated, inter-esterified, re-esterified or elaidinized; inedible mixtures or preparations of animal or vegetable fats or oils",animal_or_vegetable_fats_and_oils_and_their_fractions_chemically_modified_except_those_hydrogenated_interesterified_reesterified_or_elaidinized_inedible_mixtures_or_preparations_of_animal_or_vegetable_fats_or_oils,34550,t,1986,2024
+1275,hydrogenated oils and fats,hydrogenated_oils_and_fats,F1275,t,1986,2024
+1276,Industrial monocarboxylic fatty acids; acid oils from refining,industrial_monocarboxylic_fatty_acids_acid_oils_from_refining,34120,t,1986,2024
+1277,Residues of fatty substances,residues_of_fatty_substances,21932.02,t,1986,2024
+1293,Crude organic material n.e.c.,crude_organic_material_nec,F1293,t,1986,2024
+1295,Spermaceti,spermaceti,02960.02,t,1986,2024
+1296,"Vegetable waxes (other than triglycerides), whether or not refined or coloured",vegetable_waxes_other_than_triglycerides_whether_or_not_refined_or_coloured,21931,t,1986,2024

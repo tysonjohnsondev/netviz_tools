@@ -1,0 +1,211 @@
+{
+  "generated_by": "scripts/build_metadata.py",
+  "retrieved": "2026-09-27",
+  "sources": [
+    {
+      "name": "FAOSTAT Detailed Trade Matrix (TM), bulk normalized file",
+      "url": "https://bulks-faostat.fao.org/production/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).zip",
+      "sha256": "75b7ff8de04e7ae01f4b68150353cc0961fcbd5b0497c5f81338844345e348ec",
+      "licence": "CC BY 4.0"
+    },
+    {
+      "name": "UNSD Standard country or area codes for statistical use (M49)",
+      "url": "https://unstats.un.org/unsd/methodology/m49/overview/",
+      "sha256": "b9048114f6e7f2abda83bf03d4263c9d7cd1bd7230e3d0461025ee7839a7a1fb"
+    },
+    {
+      "name": "Natural Earth 1:10m Admin 0 Countries v5.1.2",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_0_countries.geojson",
+      "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255",
+      "licence": "Public domain"
+    }
+  ],
+  "overrides": [
+    {
+      "m49": "058",
+      "name": "Belgium-Luxembourg",
+      "field": "region",
+      "note": "Belgium-Luxembourg (to 1999) is not in current M49; region of Belgium."
+    },
+    {
+      "m49": "058",
+      "name": "Belgium-Luxembourg",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Belgium."
+    },
+    {
+      "m49": "074",
+      "name": "Bouvet Island",
+      "field": "lon/lat",
+      "note": "Not a separate Natural Earth admin-0 feature; approximate location."
+    },
+    {
+      "m49": "128",
+      "name": "Canton and Enderbury Islands",
+      "field": "region",
+      "note": "Canton and Enderbury Islands (historical) is not in current M49; now Kiribati."
+    },
+    {
+      "m49": "128",
+      "name": "Canton and Enderbury Islands",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Kiribati."
+    },
+    {
+      "m49": "200",
+      "name": "Czechoslovakia",
+      "field": "region",
+      "note": "Czechoslovakia (to 1992) is not in current M49; region of Czechia."
+    },
+    {
+      "m49": "200",
+      "name": "Czechoslovakia",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Czechia."
+    },
+    {
+      "m49": "230",
+      "name": "Ethiopia PDR",
+      "field": "region",
+      "note": "Ethiopia PDR (to 1992) is not in current M49; region of Ethiopia."
+    },
+    {
+      "m49": "230",
+      "name": "Ethiopia PDR",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Ethiopia."
+    },
+    {
+      "m49": "254",
+      "name": "French Guiana",
+      "field": "lon/lat",
+      "note": "Part of France in Natural Earth admin-0; approximate centroid."
+    },
+    {
+      "m49": "312",
+      "name": "Guadeloupe",
+      "field": "lon/lat",
+      "note": "Part of France in Natural Earth admin-0; approximate centroid."
+    },
+    {
+      "m49": "396",
+      "name": "Johnston Island",
+      "field": "region",
+      "note": "Johnston Island (historical code) is part of US Minor Outlying Islands."
+    },
+    {
+      "m49": "396",
+      "name": "Johnston Island",
+      "field": "lon/lat",
+      "note": "Not a separate Natural Earth feature; approximate atoll location."
+    },
+    {
+      "m49": "474",
+      "name": "Martinique",
+      "field": "lon/lat",
+      "note": "Part of France in Natural Earth admin-0; approximate centroid."
+    },
+    {
+      "m49": "488",
+      "name": "Midway Island",
+      "field": "region",
+      "note": "Midway Island (historical code) is part of US Minor Outlying Islands."
+    },
+    {
+      "m49": "488",
+      "name": "Midway Island",
+      "field": "lon/lat",
+      "note": "Not a separate Natural Earth feature; approximate atoll location."
+    },
+    {
+      "m49": "638",
+      "name": "R\u00e9union",
+      "field": "lon/lat",
+      "note": "Part of France in Natural Earth admin-0; approximate centroid."
+    },
+    {
+      "m49": "891",
+      "name": "Serbia and Montenegro",
+      "field": "region",
+      "note": "Serbia and Montenegro (1992-2005) is not in current M49; region of Serbia."
+    },
+    {
+      "m49": "891",
+      "name": "Serbia and Montenegro",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Serbia."
+    },
+    {
+      "m49": "736",
+      "name": "Sudan (former)",
+      "field": "region",
+      "note": "Sudan (former, to 2011) is not in current M49; region of Sudan."
+    },
+    {
+      "m49": "736",
+      "name": "Sudan (former)",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Sudan."
+    },
+    {
+      "m49": "158",
+      "name": "China, Taiwan Province of",
+      "field": "region",
+      "note": "M49 158 is not listed by UNSD; FAOSTAT places it in Eastern Asia with China."
+    },
+    {
+      "m49": "158",
+      "name": "China, Taiwan Province of",
+      "field": "iso3",
+      "note": "ISO 3166-1 alpha-3 code; M49 158 is not listed in the UNSD table."
+    },
+    {
+      "m49": "772",
+      "name": "Tokelau",
+      "field": "lon/lat",
+      "note": "Not a separate Natural Earth admin-0 feature; approximate location."
+    },
+    {
+      "m49": "810",
+      "name": "USSR",
+      "field": "region",
+      "note": "USSR (to 1991) is not in current M49; region of the Russian Federation."
+    },
+    {
+      "m49": "810",
+      "name": "USSR",
+      "field": "lon/lat",
+      "note": "Historical area; label point of the Russian Federation."
+    },
+    {
+      "m49": "872",
+      "name": "Wake Island",
+      "field": "region",
+      "note": "Wake Island (historical code) is part of US Minor Outlying Islands."
+    },
+    {
+      "m49": "872",
+      "name": "Wake Island",
+      "field": "lon/lat",
+      "note": "Not a separate Natural Earth feature; approximate atoll location."
+    },
+    {
+      "m49": "890",
+      "name": "Yugoslav SFR",
+      "field": "region",
+      "note": "Yugoslav SFR (to 1991) is not in current M49; region of Serbia."
+    },
+    {
+      "m49": "890",
+      "name": "Yugoslav SFR",
+      "field": "lon/lat",
+      "note": "Historical area; label point of Serbia."
+    },
+    {
+      "m49": "744",
+      "name": "Svalbard and Jan Mayen Islands",
+      "field": "lon/lat",
+      "note": "Part of Norway in Natural Earth admin-0; approximate centroid."
+    }
+  ]
+}
