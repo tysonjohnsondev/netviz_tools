@@ -198,6 +198,7 @@ labels attached so charts say Exporter and Importer. Use `nv.clean` for your own
 tables. `build_store` downloads the FAOSTAT bulk file with pooch, checks its SHA-256
 against the release pinned in this version, and converts it with DuckDB into a
 Parquet dataset partitioned by item (about 400 MB, about a minute on a laptop).
+For the pinned release that is 45,948,872 rows.
 A `manifest.json` next to the data records the source URL, the SHA-256 actually
 used, the retrieval time, row counts and the library version. `load` then
 queries only the items you ask for.
