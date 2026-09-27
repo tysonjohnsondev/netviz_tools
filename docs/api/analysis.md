@@ -1,6 +1,6 @@
 # analysis
 
-Table-level questions: partner rankings and item comparisons. `partners` and `compare_items` are re-exported as `nv.partners` and `nv.compare_items`.
+Table-level questions: partner rankings and category comparisons. `partners` and `compare_categories` are re-exported as `nv.partners` and `nv.compare_categories`.
 
 ::: netviz_tools.analysis
     options:

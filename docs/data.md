@@ -60,6 +60,19 @@ If you build your own store from a newer file, cite that file's update year and 
 
 `load()` then selects the reporting perspective (`reporter="importer"`, `"exporter"` or `"combined"`), the measure, the items and the years. With `"combined"`, the importer's report is used where one exists and the exporter's otherwise, decided per exporter, importer, item and year.
 
+The store keeps FAOSTAT's own column names. `load()` and `load_sample()` return them under the library's generic flow-frame names:
+
+| Store column | Returned as |
+| --- | --- |
+| `exporter`, `importer` | `source`, `target` |
+| `year` | `time` |
+| `item` | `category` |
+| `value` (for the chosen `measure`) | `weight` |
+| `unit` | `unit` |
+| `exporter_code`, `importer_code` (with `details=True`) | `source_code`, `target_code` |
+
+`item_code`, `reported_by` and `flag` keep their names. Each returned frame carries a copy of `faostat.LABELS` in `flows.attrs["labels"]` (`"source": "Exporter"`, `"target": "Importer"`, `"time": "Year"`, `"category": "Item"`, `"weight": "Quantity"`, or `"Value"` with `measure="value"`), which graphs and plots use as display labels.
+
 ### Why the reporter perspective matters
 
 The two reports of the same flow often disagree, and some countries stop reporting. In the bundled sample, the Russian Federation's wheat exports look like this (million tonnes):

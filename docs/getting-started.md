@@ -1,6 +1,6 @@
 # Getting started
 
-This page walks through the library from a flow table to a figure. Every example runs offline on the bundled FAOSTAT sample.
+This page walks through the library from a flow table to a figure. FAOSTAT trade data is the worked example, and every example runs offline on the bundled sample; the same steps apply to migration or any other flow data (see [Bringing your own data](#bringing-your-own-data)).
 
 ```python
 import netviz_tools as nv
@@ -13,107 +13,137 @@ Every function in the library works on a *flow frame*: a pandas DataFrame with o
 
 | Column | Meaning |
 | --- | --- |
-| `exporter` | origin node (for trade data, the exporting country) |
-| `importer` | destination node (the importing country) |
-| `year` | integer period label |
-| `item` | what flows: a commodity, a product code, a type of migrant |
-| `quantity` | non-negative amount |
-| `unit` | unit of `quantity`, for example `"t"` or `"1000 USD"` |
+| `source` | origin node (for trade data, the exporting country) |
+| `target` | destination node (for trade data, the importing country) |
+| `time` | integer period label, for example a year |
+| `category` | what flows: a commodity, a product code, a type of migrant |
+| `weight` | non-negative amount |
+| `unit` | unit of `weight`, for example `"t"`, `"persons"` or `"1000 USD"` |
 
 Extra columns are allowed and kept. `nv.validate_flows(df)` checks the schema and reports every problem at once:
 
 ```python
 >>> nv.validate_flows(bad)
-SchemaError: invalid flow data: column 'importer' has 1 missing values;
-column 'year' must be integer, not float64; column 'quantity' has negative values
+SchemaError: invalid flow data: column 'target' has 1 missing values;
+column 'time' must be integer, not float64; column 'weight' has negative values
 ```
 
-The sample holds quantity flows in tonnes for Wheat, Maize (corn) and Soya beans, 2010 to 2024:
+The sample holds quantity flows in tonnes for Wheat, Maize (corn) and Soya beans, 2010 to 2024. The FAOSTAT loaders return the generic columns (`source` is the exporter, `target` the importer, `time` the year, `category` the FAOSTAT item and `weight` the quantity):
 
 ```python
 >>> flows = faostat.load_sample(items="Wheat", years=2022)
 >>> flows.head(3)
-  exporter                          importer  year   item  quantity unit
-0  Algeria                            France  2022  Wheat     28.36    t
-1  Algeria      Netherlands (Kingdom of the)  2022  Wheat    280.00    t
-2   Angola  Democratic Republic of the Congo  2022  Wheat    565.76    t
+    source                            target  time category  weight unit
+0  Algeria                            France  2022    Wheat   28.36    t
+1  Algeria      Netherlands (Kingdom of the)  2022    Wheat  280.00    t
+2   Angola  Democratic Republic of the Congo  2022    Wheat  565.76    t
 >>> len(flows)
 1646
 ```
+
+Display names travel with the data. Every FAOSTAT frame carries `faostat.LABELS` in `flows.attrs["labels"]`, graphs copy it into `G.graph["labels"]`, and the plots use it, so FAOSTAT charts say "Exporter" and "Importer" without you typing them:
+
+```python
+>>> flows.attrs["labels"]
+{'source': 'Exporter', 'target': 'Importer', 'time': 'Year', 'category': 'Item',
+ 'weight': 'Quantity', 'node': 'Country', 'out': 'Exports', 'in': 'Imports'}
+```
+
+For your own data, set `df.attrs["labels"]` to a dict with any of these keys (for example `{"source": "Origin", "target": "Destination"}`).
 
 Items can be given by FAOSTAT name (case-insensitive), by item code (`15` is wheat), or by the snake_case slug used in netviz_tools 0.x. A misspelt name raises `UnknownItemError` with suggestions: `unknown item 'wheet'. Did you mean: 'Wheat', 'Sheep'?`. `faostat.items("soya")` searches the catalogue of 558 traded items.
 
 ## Building graphs
 
-`nv.build_graph` turns one slice of a flow frame (one year, one item) into a weighted `networkx.DiGraph`. Edge amounts are stored under `"weight"`, the default weight name of NetworkX algorithms, and the slice is recorded in `G.graph`:
+`nv.build_graph` turns one slice of a flow frame (one `time` value, one `category`) into a weighted `networkx.DiGraph`. Edge amounts are stored under `"weight"`, the default weight name of NetworkX algorithms, and the slice is recorded in `G.graph`:
 
 ```python
 >>> g = nv.build_graph(flows, node_attrs=faostat.countries())
 >>> g.number_of_nodes(), g.number_of_edges()
 (166, 1646)
->>> g.graph
-{'weight': 'quantity', 'aggregate': None, 'unit': 't', 'year': 2022, 'item': 'Wheat'}
+>>> {k: v for k, v in g.graph.items() if k != "labels"}
+{'aggregate': None, 'unit': 't', 'time': 2022, 'category': 'Wheat'}
 ```
+
+`time=` and `category=` select a slice from a larger frame before building. Each takes one value or an iterable of values:
+
+```python
+>>> sample = faostat.load_sample()  # all three items, 2010 to 2024
+>>> g = nv.build_graph(sample, time=2022, category="Wheat", node_attrs=faostat.countries())
+>>> g.number_of_edges()
+1646
+```
+
+A value that matches no flows raises `ValueError` and lists what is there: `no flows with time=2030. Available values (15): 2010, 2011, ...`, or for a misspelt category `no flows with category='wheat'. Did you mean: 'Wheat'? ...`.
 
 `node_attrs` attaches columns of a table indexed by node name as node attributes. `faostat.countries()` gives each FAOSTAT area its UN M49 region, a `continent` column (M49 regions with the Americas split into Northern America, Central America, the Caribbean and South America), and a label point (`lon`, `lat`). The plots use `continent` for colour.
 
 Other options: `directed=False` sums both directions of each pair into an undirected graph, and `self_loops=True` keeps flows from a country to itself (dropped by default).
 
-### Why mixed years and items raise
+### Why mixed slices raise
 
-Adding up flows from different years or different commodities is almost never what you want by accident: a graph of "wheat plus maize, 2020 to 2022" has edge weights that mean nothing in particular. So `build_graph` refuses to do it silently:
+Adding up flows from different periods or different categories is almost never what you want by accident: a graph of "wheat plus maize, 2020 to 2022" has edge weights that mean nothing in particular. So `build_graph` refuses to do it silently:
 
 ```python
->>> nv.build_graph(faostat.load_sample(items="Wheat", years=[2021, 2022]))
-MixedSliceError: flows contain 2 values of 'year' (2021, 2022). Build one graph per
-slice with graphs_by(), filter the flows first, or pass aggregate='sum' or aggregate='mean'.
+>>> nv.build_graph(sample, category="Wheat", time=[2021, 2022])
+MixedSliceError: flows contain 2 values of 'time' (2021, 2022). Select one slice with
+time= or category=, build one graph per slice with graphs_by(), or pass aggregate='sum'
+or aggregate='mean'.
 ```
 
 If you do want a combined graph, say how to combine:
 
 - `aggregate="sum"` totals the flows.
-- `aggregate="mean"` divides the total by the number of slices present, so a pair missing from one year counts as zero for that year.
+- `aggregate="mean"` divides the total by the number of slices present, so a pair missing from one period counts as zero for that period.
 
 ```python
->>> g2 = nv.build_graph(faostat.load_sample(items="Wheat", years=[2021, 2022]), aggregate="mean")
->>> g2.graph
-{'weight': 'quantity', 'aggregate': 'mean', 'unit': 't', 'year': [2021, 2022],
- 'item': 'Wheat', 'n_slices': 2}
+>>> g2 = nv.build_graph(sample, category="Wheat", time=[2021, 2022], aggregate="mean")
+>>> {k: v for k, v in g2.graph.items() if k != "labels"}
+{'aggregate': 'mean', 'unit': 't', 'time': [2021, 2022], 'category': 'Wheat', 'n_slices': 2}
 ```
 
 Units are never mixed: if the flows contain more than one `unit`, `build_graph` raises `MixedUnitError` whatever `aggregate` says.
 
 ### One graph per slice
 
-`nv.graphs_by` groups a flow frame and builds one graph per group. The default groups by `("year", "item")`:
+`nv.graphs_by` groups a flow frame and builds one graph per group. The default groups by `("time", "category")`:
 
 ```python
 >>> gs = nv.graphs_by(faostat.load_sample(years=range(2020, 2023)))
 >>> list(gs)[:3]
 [(2020, 'Maize (corn)'), (2020, 'Soya beans'), (2020, 'Wheat')]
->>> wheat_by_year = nv.graphs_by(faostat.load_sample(items="Wheat"), by="year")
+>>> wheat_by_year = nv.graphs_by(sample, by="time", category="Wheat")
 >>> sorted(wheat_by_year)[:3]
 [2010, 2011, 2012]
 ```
 
-Extra keyword arguments go to `build_graph`. Grouping by `"year"` over several items therefore needs `aggregate=` as well. `nv.graph_to_flows(g)` converts a graph back into a flow table.
+`time=` and `category=` filter the whole frame before grouping; other keyword arguments go to `build_graph`. Grouping by `"time"` over several categories therefore needs `category=` or `aggregate=`. Every graph carries the frame's `labels`. `nv.graph_to_flows(g)` converts a graph back into a flow table (and its labels back into `df.attrs["labels"]`).
 
-## Partners and item comparisons
+## Partners and category comparisons
 
 Two table-level helpers do not need a graph:
 
 ```python
->>> nv.partners(flows, "Ukraine", role="exporter", top_n=3)
-           quantity  share
+>>> nv.partners(flows, "Ukraine", role="out", top_n=3)
+             weight  share
 partner
 Türkiye  2059037.61  0.246
 Spain    1017543.91  0.122
 Poland    522878.19  0.063
 ```
 
-`role="importer"` ranks where a country's imports come from, and `role="both"` puts exports and imports per partner side by side. Country names are matched exactly; `nv.partners(flows, "Russia")` raises `UnknownCountryError: unknown country 'Russia'. Did you mean: 'Russian Federation', 'Tunisia', 'Austria'?`.
+`role="out"` ranks where a node's flows go (for trade, its export destinations), `role="in"` ranks where its inflows come from (its import sources), and `role="both"` puts `out_weight` and `in_weight` per partner side by side, ranked by `total_weight`. `time=` and `category=` filter first. Node names are matched exactly; `nv.partners(flows, "Russia")` raises `UnknownNodeError: unknown node 'Russia'. Did you mean: 'Russian Federation', 'Tunisia', 'Austria'?`.
 
-`nv.compare_items(flows, metric)` ranks items by total quantity, number of flows, or number of exporting, importing or participating countries, optionally per year.
+`nv.compare_categories(flows, metric)` ranks categories by `"total_weight"` (with the unit in the index, so units are never compared directly), `"n_flows"`, or the number of distinct sources, targets or nodes (`"n_sources"`, `"n_targets"`, `"n_nodes"`), optionally per period with `by_time=True`:
+
+```python
+>>> nv.compare_categories(sample, "n_sources", by_time=True).iloc[:, -3:]
+time          2022  2023  2024
+category
+Maize (corn)   148   147   145
+Wheat          119   124   122
+Soya beans     128   128   120
+```
 
 ## Metrics
 
@@ -130,7 +160,7 @@ France               17663116.08          0.026335  0.028522
 
 The measures are `in_strength`, `out_strength`, `strength` (weighted degree, in the graph's unit), `in_degree`, `out_degree`, `degree` (number of partners), `pagerank` (high when large flows arrive from high-ranking nodes: an important destination), `reverse_pagerank` (PageRank on the reversed graph: an important source) and `betweenness` (weighted, with `1 / weight` as the edge length, so large flows count as short routes).
 
-Graph-level metrics live in `nv.temporal`: `graph_summary(g)` for one graph, and `metric_series(graphs)` for a mapping of graphs such as the output of `graphs_by(..., by="year")`:
+Graph-level metrics live in `nv.temporal`: `graph_summary(g)` for one graph, and `metric_series(graphs)` for a mapping of graphs such as the output of `graphs_by(..., by="time")`:
 
 ```python
 >>> ts = nv.temporal.metric_series(wheat_by_year, ["total_weight", "out_strength_hhi"])
@@ -141,7 +171,7 @@ Graph-level metrics live in `nv.temporal`: `graph_summary(g)` for one graph, and
 2023  1.753090e+08          0.099115
 ```
 
-`out_strength_hhi` is the Herfindahl-Hirschman index of exporters' shares of total volume: 1 means one supplier, `1/n` means `n` equal suppliers. `centrality_series(graphs, kind, nodes=[...])` tracks one centrality measure per country across the same graphs; a country absent in a year gets `fill_value` (0 by default).
+`out_strength_hhi` is the Herfindahl-Hirschman index of sources' shares of total volume (for trade, exporters' shares): 1 means one supplier, `1/n` means `n` equal suppliers. `centrality_series(graphs, kind, nodes=[...])` tracks one centrality measure per node across the same graphs; a node absent in a period gets `fill_value` (0 by default).
 
 ## Communities
 
@@ -189,7 +219,7 @@ Node sizes and edge widths are log-scaled so that a few very large flows do not 
 
 ## Bringing your own data
 
-`nv.to_flowframe` converts any edge list into a flow frame. Map your column names to schema names, and give constants for the columns you do not have:
+`nv.to_flowframe` converts any edge list into a flow frame. Map your column names to schema names, and give constants for the columns you do not have. Migration between regions, for example:
 
 ```python
 import pandas as pd
@@ -203,15 +233,16 @@ raw = pd.DataFrame(
 )
 ff = nv.to_flowframe(
     raw,
-    {"origin": "exporter", "dest": "importer", "people": "quantity"},
-    year=2020,
-    item="migrants",
+    {"origin": "source", "dest": "target", "people": "weight"},
+    time=2020,
+    category="migrants",
     unit="persons",
 )
+ff.attrs["labels"] = {"source": "Origin", "target": "Destination", "node": "Region"}
 g = nv.build_graph(ff)
 ```
 
-The result has the six schema columns first, then any other columns of `raw`, and `year` is cast to `int64`. From here every metric and plot works the same way. Continent colouring needs a `continent` node attribute (pass `node_attrs=`), or use `color_by=None`; flow maps need `coords=` unless the node names are FAOSTAT country names.
+The result has the six schema columns first, then any other columns of `raw`, and a whole-number `time` is cast to `int64`. `attrs` set on `raw` are kept. From here every metric and plot works the same way. Continent colouring needs a `continent` node attribute (pass `node_attrs=`), or use `color_by=None`; flow maps need `coords=` unless the node names are FAOSTAT country names.
 
 ## The full FAOSTAT store
 
@@ -228,7 +259,7 @@ flows = faostat.load("Coffee, green", years=range(2015, 2025))
 
 **Cache directory.** The zip and the store live in `faostat.default_cache_dir()`: the operating system's user cache directory (for example `~/.cache/netviz_tools` on Linux), unless the environment variable `NETVIZ_TOOLS_CACHE` is set. Every function that touches the store also takes `cache_dir=`. `faostat.store_path()` shows where the store is, and `faostat.store_info()` returns its `manifest.json`. Calling `load()` before the store exists raises `StoreNotFoundError` with instructions.
 
-**Reporter perspective.** Each trade flow can be reported twice, by the exporting country and by the importing country, and the two reports often differ. `load()` and `load_sample()` take `reporter=`:
+**Reporter perspective.** Each trade flow can be reported twice, by the exporting country and by the importing country, and the two reports often differ. `load()` and `load_sample()` take `reporter=` (these FAOSTAT-specific options keep their trade names):
 
 - `"importer"` (default): flows as reported by the importing country. More countries report imports than exports: for wheat in 2021 the sample has 155 reporting importers against 99 reporting exporters.
 - `"exporter"`: flows as reported by the exporting country.
@@ -236,8 +267,8 @@ flows = faostat.load("Coffee, green", years=range(2015, 2025))
 
 The choice matters. The Russian Federation reports no wheat exports after 2021, so in exporter-reported data it has no wheat exports at all in 2022. Importer-reported data still show about 22.4 million tonnes that year. See the [wheat notebook](gallery/wheat-2022-shock.ipynb).
 
-**Trade value.** `load(..., measure="value")` returns trade value in `1000 USD` instead of physical quantity. Quantities are in `t`, `head` or `number`. Values and quantities are never mixed in one frame, but the live-animal items (cattle, sheep, chickens and so on) have quantity rows in both `head` and `t`; filter on `unit` before building a graph, or `build_graph` raises `MixedUnitError`. The bundled sample contains quantities only.
+**Trade value.** `load(..., measure="value")` returns trade value in `1000 USD` in the `weight` column instead of physical quantity, and sets `labels["weight"]` to `"Value"`. Quantities are in `t`, `head` or `number`. Values and quantities are never mixed in one frame, but the live-animal items (cattle, sheep, chickens and so on) have quantity rows in both `head` and `t`; filter on `unit` before building a graph, or `build_graph` raises `MixedUnitError`. The bundled sample contains quantities only.
 
-**Details.** `load(..., details=True)` adds `item_code`, `exporter_code`, `importer_code`, `reported_by` and the FAOSTAT `flag`. `self_loops=True` keeps flows from a country to itself (re-imports), which the store keeps but `load` drops by default.
+**Details.** `load(..., details=True)` adds `item_code`, `source_code` and `target_code` (FAOSTAT area codes), `reported_by` (`"exporter"` or `"importer"`) and the FAOSTAT `flag`. `self_loops=True` keeps flows from a country to itself (re-imports), which the store keeps but `load` drops by default.
 
 See [Data and licences](data.md) for the transformation rules, the pinned release, and how to cite FAOSTAT.
