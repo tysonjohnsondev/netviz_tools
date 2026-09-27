@@ -474,15 +474,22 @@ def test_tuple_nodes() -> None:
 def test_disconnected_layouts_do_not_collapse(layout: nv.plot.Layout) -> None:
     parts = [nx.cycle_graph(8), nx.path_graph(5), nx.star_graph(4), nx.empty_graph(3)]
     g = nx.disjoint_union_all(parts)
-    xs = node_xs(spec(nv.plot.network(g, layout=layout, color_by=None, size_by=None)))
-    ys = [
-        y
-        for t in spec(nv.plot.network(g, layout=layout, color_by=None, size_by=None))["data"]
-        if t.get("legendgroup") == "nodes"
-        for y in t["y"]
+    s = spec(nv.plot.network(g, layout=layout, color_by=None, size_by=None))
+    pos: dict[int, tuple[float, float]] = {}
+    for t in s["data"]:
+        if t.get("legendgroup") == "nodes":
+            for x, y, h in zip(t["x"], t["y"], t["hovertext"], strict=True):
+                pos[int(h.split("</b>")[0].removeprefix("<b>"))] = (x, y)
+    assert set(pos) == set(g)
+    # Each component gets its own region: centres of different components are apart.
+    # (Nodes inside one symmetric component may coincide in a spectral layout.)
+    comps = [list(c) for c in nx.connected_components(g) if len(c) > 1]
+    centres = [
+        (sum(pos[n][0] for n in c) / len(c), sum(pos[n][1] for n in c) / len(c)) for c in comps
     ]
-    points = {(round(x, 3), round(y, 3)) for x, y in zip(xs, ys, strict=True)}
-    assert len(points) == g.number_of_nodes()
+    for i, a in enumerate(centres):
+        for b in centres[i + 1 :]:
+            assert abs(a[0] - b[0]) + abs(a[1] - b[1]) > 0.1
 
 
 def test_layout_options_override_defaults() -> None:
