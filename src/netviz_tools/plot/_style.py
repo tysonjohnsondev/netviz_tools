@@ -1,14 +1,14 @@
-"""Shared colours, scaling and labelling helpers for the plot modules."""
+"""Shared colours, scaling, labels and number formatting for the plot modules."""
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+import math
+from collections.abc import Iterable, Mapping
 from typing import Any, Final
 
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 
 PALETTE: Final = (
     "#2a78d6",  # blue
@@ -21,11 +21,28 @@ PALETTE: Final = (
     "#e34948",  # red
 )
 """Categorical palette in fixed order. It passes adjacent-pair colour-vision
-deficiency checks; categories beyond eight are folded into ``OTHER``."""
+deficiency checks; categories beyond eight are folded into ``"Other"``."""
 
+SEQUENTIAL: Final = (
+    (0.0, "#c6dbef"),
+    (0.25, "#8fbbe0"),
+    (0.5, "#4f93cc"),
+    (0.75, "#2166ac"),
+    (1.0, "#08306b"),
+)
+"""Single-hue sequential colour scale used for continuous values. It starts
+at a light blue rather than white, so the smallest values stay visible on a
+white background."""
+
+DECREASE_COLOR: Final = "#c2410c"
+INCREASE_COLOR: Final = "#2166ac"
 OTHER_COLOR: Final = "#8a8986"
+MISSING_COLOR: Final = "#cfcfcb"
 OTHER_LABEL: Final = "Other"
+MISSING_LABEL: Final = "No value"
 EDGE_COLOR: Final = "rgba(110, 110, 110, 0.35)"
+EDGE_FOCUS_COLOR: Final = "rgba(40, 40, 40, 0.7)"
+TEXT_COLOR: Final = "#3d3d3a"
 SURFACE: Final = "#ffffff"
 
 CONTINENT_COLORS: Final[Mapping[str, str]] = {
@@ -38,7 +55,22 @@ CONTINENT_COLORS: Final[Mapping[str, str]] = {
     "Central America": PALETTE[6],
     "Caribbean": PALETTE[7],
 }
-"""Colour per continent, as defined in :func:`netviz_tools.datasets.faostat.countries`."""
+"""Colour per continent, as defined in :func:`netviz_tools.datasets.faostat.countries`.
+Used whenever every category of ``color_by`` is one of these continents."""
+
+DEFAULT_LABELS: Final[Mapping[str, str]] = {
+    "source": "Source",
+    "target": "Target",
+    "time": "Time",
+    "category": "Category",
+    "weight": "Weight",
+    "node": "Node",
+    "out": "Outgoing",
+    "in": "Incoming",
+}
+"""Display labels used when neither the data nor the caller gives one.
+Override any of them with ``labels=``. FAOSTAT flows carry their own
+(:data:`netviz_tools.datasets.faostat.LABELS`)."""
 
 
 def scale(
@@ -53,7 +85,7 @@ def scale(
     lo, hi
         Output range.
     log
-        Apply ``log10(1 + x)`` first, so that a few very large flows do not
+        Apply ``log10(1 + x)`` first, so that a few very large values do not
         flatten everything else.
 
     Returns
@@ -72,6 +104,46 @@ def scale(
     return np.asarray(lo + (arr - arr.min()) / span * (hi - lo), dtype=float)
 
 
+def wants_log(values: Iterable[float]) -> bool:
+    """Return True when positive values span more than two orders of magnitude."""
+    arr = np.asarray([v for v in values if np.isfinite(v) and v > 0], dtype=float)
+    return bool(arr.size > 1 and arr.max() / arr.min() > 100.0)
+
+
+class Scaler:
+    """Scale values onto a range using bounds fixed in advance.
+
+    Values are log-scaled when they span more than two orders of magnitude.
+    Fixing the bounds lets every frame of an animation share one scale.
+    Missing values map to ``lo``.
+    """
+
+    def __init__(self, values: Iterable[float], lo: float, hi: float) -> None:
+        arr = np.asarray([v for v in values if np.isfinite(v)], dtype=float)
+        self.log = wants_log(arr)
+        t = self._t(arr)
+        self.vmin = float(t.min()) if t.size else 0.0
+        self.vmax = float(t.max()) if t.size else 0.0
+        self.lo, self.hi = lo, hi
+
+    def _t(self, arr: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        if self.log:
+            return np.asarray(np.log10(1.0 + np.clip(arr, 0.0, None)), dtype=float)
+        return arr
+
+    def unit(self, values: Iterable[float]) -> npt.NDArray[np.float64]:
+        """Return positions in ``[0, 1]`` (NaN stays NaN)."""
+        arr = np.asarray(list(values), dtype=float)
+        span = self.vmax - self.vmin
+        if span == 0.0:
+            return np.where(np.isfinite(arr), 1.0, np.nan)
+        return np.asarray(np.clip((self._t(arr) - self.vmin) / span, 0.0, 1.0), dtype=float)
+
+    def __call__(self, values: Iterable[float]) -> npt.NDArray[np.float64]:
+        t = self.unit(values)
+        return np.asarray(self.lo + np.nan_to_num(t, nan=0.0) * (self.hi - self.lo), dtype=float)
+
+
 def rgba(hex_color: str, alpha: float) -> str:
     """Convert ``#rrggbb`` to a CSS ``rgba()`` string."""
     h = hex_color.lstrip("#")
@@ -79,65 +151,101 @@ def rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r}, {g}, {b}, {alpha})"
 
 
-def categories(
-    g: nx.Graph[Any],
-    nodes: Sequence[Hashable],
-    color_by: str | None,
-    partition: pd.Series | None,
-) -> tuple[dict[Hashable, str], dict[str, str]]:
-    """Assign each node a category label and each label a colour.
+def sample_sequential(t: float) -> str:
+    """Return the :data:`SEQUENTIAL` colour at position ``t`` in ``[0, 1]``."""
+    t = min(max(float(t), 0.0), 1.0)
+    for (t0, c0), (t1, c1) in zip(SEQUENTIAL, SEQUENTIAL[1:], strict=False):
+        if t <= t1:
+            f = (t - t0) / (t1 - t0)
+            a = [int(c0[i : i + 2], 16) for i in (1, 3, 5)]
+            b = [int(c1[i : i + 2], 16) for i in (1, 3, 5)]
+            mix = [round(x + (y - x) * f) for x, y in zip(a, b, strict=True)]
+            return "#" + "".join(f"{v:02x}" for v in mix)
+    return SEQUENTIAL[-1][1]  # pragma: no cover - t is clipped to [0, 1]
 
-    Returns
-    -------
-    tuple of dict
-        ``(node -> label, label -> colour)``. Labels keep a stable order:
-        continents follow :data:`CONTINENT_COLORS`; other attributes are
-        ordered by the number of nodes in each category.
-    """
-    if color_by is None:
-        return dict.fromkeys(nodes, ""), {"": PALETTE[0]}
-    if color_by == "community":
-        if partition is None:
-            raise ValueError("color_by='community' needs partition= (see metrics.communities)")
-        lookup = partition.to_dict()
-        raw = {n: f"Community {int(lookup[n])}" if n in lookup else OTHER_LABEL for n in nodes}
-    else:
-        raw = {n: str(g.nodes[n].get(color_by, OTHER_LABEL) or OTHER_LABEL) for n in nodes}
-    if color_by == "continent":
-        colors = {c: CONTINENT_COLORS[c] for c in CONTINENT_COLORS if c in raw.values()}
-    else:
-        counts = pd.Series(list(raw.values())).value_counts()
-        ordered = [c for c in counts.index if c != OTHER_LABEL]
-        if color_by == "community":
-            ordered.sort(key=lambda c: int(c.split()[-1]))
-        colors = dict(zip(ordered[: len(PALETTE)], PALETTE, strict=False))
-    labels = {n: (lab if lab in colors else OTHER_LABEL) for n, lab in raw.items()}
-    if OTHER_LABEL in labels.values():
-        colors[OTHER_LABEL] = OTHER_COLOR
-    return labels, colors
+
+def merge_labels(*layers: Mapping[str, str] | None) -> dict[str, str]:
+    """Merge display-label mappings over :data:`DEFAULT_LABELS`; later layers win."""
+    out = dict(DEFAULT_LABELS)
+    for layer in layers:
+        if layer:
+            out.update({str(k): str(v) for k, v in layer.items()})
+    return out
+
+
+def graph_labels(g: nx.Graph[Any]) -> Mapping[str, str] | None:
+    """Return the display labels stored on a graph by ``build_graph``, if any."""
+    labels = g.graph.get("labels")
+    return labels if isinstance(labels, Mapping) else None
 
 
 def unit_of(g: nx.Graph[Any]) -> str:
-    """Return the graph's unit suffix for hover text, for example ``" t"``."""
+    """Return the graph's unit, for example ``"t"``, or ``""``."""
     unit = g.graph.get("unit")
-    return f" {unit}" if isinstance(unit, str) and unit else ""
+    return unit if isinstance(unit, str) else ""
+
+
+def fmt(value: float | None, unit: str = "") -> str:
+    """Format a number for hover text and annotations."""
+    if value is None or not math.isfinite(float(value)):
+        return "n/a"
+    v = float(value)
+    if v == int(v) and abs(v) < 1e15:
+        text = f"{int(v):,}"
+    elif abs(v) >= 100:
+        text = f"{v:,.0f}"
+    elif abs(v) >= 1:
+        text = f"{v:,.2f}"
+    else:
+        text = f"{v:.3g}"
+    return f"{text} {unit}" if unit else text
+
+
+def fmt_pct(value: float) -> str:
+    """Format a fraction as a signed percentage, for example ``"+12.5%"``."""
+    if not math.isfinite(value):
+        return "n/a"
+    return f"{value * 100:+.1f}%"
 
 
 def default_title(g: nx.Graph[Any], what: str) -> str:
-    """Build a title such as ``"Wheat trade network, 2022"`` from graph metadata."""
-    item = g.graph.get("item")
-    year = g.graph.get("year")
-    head = f"{item} {what}" if isinstance(item, str) else what.capitalize()
-    if isinstance(year, int):
-        return f"{head}, {year}"
-    if isinstance(year, list) and year:
+    """Build a title such as ``"Wheat network, 2022"`` from graph metadata.
+
+    Uses ``G.graph["category"]`` and ``G.graph["time"]`` when present, then
+    ``G.graph["name"]``, then ``what`` alone.
+    """
+    category = g.graph.get("category")
+    name = g.graph.get("name")
+    if isinstance(category, str):
+        head = f"{category} {what}"
+    elif isinstance(name, str) and name:
+        head = f"{name}: {what}"
+    else:
+        head = what[:1].upper() + what[1:]
+    t = g.graph.get("time")
+    if isinstance(t, int):
+        return f"{head}, {t}"
+    if isinstance(t, list) and t:
         agg = g.graph.get("aggregate") or "sum"
-        return f"{head}, {min(year)} to {max(year)} ({agg})"
+        return f"{head}, {min(t)} to {max(t)} ({agg})"
     return head
 
 
-def top_nodes(g: nx.Graph[Any], top_n: int | None) -> list[Hashable]:
-    """Return nodes ordered by total strength, keeping at most ``top_n``."""
-    strength = pd.Series(dict(g.degree(weight="weight")), dtype=float)
-    order = strength.sort_values(ascending=False, kind="stable").index.tolist()
-    return order if top_n is None else order[:top_n]
+def base_layout(
+    title: str | None, height: int, *, margin: Mapping[str, int] | None = None
+) -> dict[str, Any]:
+    """Return the layout settings shared by every figure."""
+    return {
+        "title": {"text": title or ""},
+        "template": "plotly_white",
+        "height": height,
+        "font": {"color": TEXT_COLOR},
+        "hoverlabel": {"align": "left"},
+        "margin": dict(margin) if margin else {"l": 10, "r": 10, "t": 60, "b": 10},
+    }
+
+
+def lower_label(label: str) -> str:
+    """Lower-case a display label for use mid-sentence, keeping acronyms such as ``PageRank``."""
+    head, rest = label[:1], label[1:]
+    return head.lower() + rest if rest == rest.lower() else label
