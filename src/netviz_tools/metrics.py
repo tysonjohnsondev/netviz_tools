@@ -143,8 +143,12 @@ def centrality(
         "betweenness": lambda: _betweenness(g, normalized),
     }
     nodes = list(g.nodes)
-    data = {k: pd.Series(compute[k](), dtype=float).reindex(nodes) for k in kinds}
-    df = pd.DataFrame(data, index=pd.Index(nodes, name="node"))
+    index = pd.Index(nodes, name="node", tupleize_cols=False)  # tuple nodes stay whole
+    data = {}
+    for k in kinds:
+        values = compute[k]()
+        data[k] = pd.Series([values.get(n, float("nan")) for n in nodes], index=index, dtype=float)
+    df = pd.DataFrame(data, index=index)
     if kinds:
         df = df.sort_values(kinds[0], ascending=False, kind="stable")
     return df
@@ -203,7 +207,10 @@ def communities(
         )
     ordered = sorted(parts, key=lambda c: (-len(c), min(map(str, c))))
     labels = {node: i for i, comm in enumerate(ordered) for node in comm}
-    return pd.Series(labels, name="community", dtype="int64").rename_axis("node").sort_index()
+    index = pd.Index(list(labels), name="node", tupleize_cols=False)  # tuple nodes stay whole
+    return pd.Series(
+        list(labels.values()), index=index, name="community", dtype="int64"
+    ).sort_index()
 
 
 def modularity(g: nx.Graph[Any], partition: pd.Series) -> float:
