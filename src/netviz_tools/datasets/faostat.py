@@ -82,6 +82,7 @@ __all__ = [
     "items",
     "load",
     "load_sample",
+    "raw_sample",
     "store_info",
     "store_path",
 ]
@@ -719,24 +720,108 @@ def load_sample(
     >>> flows.columns.tolist()
     ['exporter', 'importer', 'year', 'item', 'quantity', 'unit']
     """
-    sample_items = _sample_items()
-    if items is None:
-        resolved = sample_items
-    else:
-        resolved = _resolve_items(items)
-        absent = [name for code, name in resolved if (code, name) not in sample_items]
-        if absent:
-            raise UnknownItemError(absent[0], [name for _, name in sample_items])
     return _query(
         "read_parquet(?)",
         [_sample_path()],
-        [code for code, _ in resolved],
+        _resolve_sample_items(items),
         _resolve_years(years),
         reporter,
         "quantity",
         self_loops,
         details,
     )
+
+
+def _resolve_sample_items(items: str | int | Iterable[str | int] | None) -> list[int]:
+    sample_items = _sample_items()
+    if items is None:
+        return [code for code, _ in sample_items]
+    resolved = _resolve_items(items)
+    absent = [name for code, name in resolved if (code, name) not in sample_items]
+    if absent:
+        raise UnknownItemError(absent[0], [name for _, name in sample_items])
+    return [code for code, _ in resolved]
+
+
+def raw_sample(
+    items: str | int | Iterable[str | int] | None = None,
+    years: int | Iterable[int] | None = None,
+) -> pd.DataFrame:
+    """Return the bundled sample in the column layout of the FAOSTAT bulk file.
+
+    This is the bundled sample (see :func:`load_sample`) re-expanded into the
+    layout of the bulk CSV, so that :func:`netviz_tools.clean`
+    can be demonstrated offline on a realistic reporter-based table. It is
+    not a fresh download. Each row is one country's report: a flow reported
+    by the exporter appears with that country as reporter and the element
+    ``"Export quantity"``; a flow reported by the importer appears with the
+    importer as reporter and ``"Import quantity"``. Self-loops are included,
+    as in the bulk file. The M49 and CPC code columns of the bulk file are
+    omitted because the sample does not carry them.
+
+    Parameters
+    ----------
+    items
+        Items to keep; defaults to all three sample items.
+    years
+        Years to keep; defaults to all.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``Reporter Country Code``, ``Reporter Countries``,
+        ``Partner Country Code``, ``Partner Countries``, ``Item Code``,
+        ``Item``, ``Element Code``, ``Element``, ``Year Code``, ``Year``,
+        ``Unit``, ``Value`` and ``Flag``, sorted by item, year, reporter,
+        partner and element.
+
+    Raises
+    ------
+    UnknownItemError
+        If an item is not in the catalogue, or is in the catalogue but not in
+        the sample.
+
+    Examples
+    --------
+    >>> from netviz_tools.datasets import faostat
+    >>> raw = faostat.raw_sample(items="Wheat", years=2022)
+    >>> sorted(raw["Element"].unique())
+    ['Export quantity', 'Import quantity']
+    """
+    codes = _resolve_sample_items(items)
+    yrs = _resolve_years(years)
+    df = pd.read_parquet(_sample_path())
+    keep = df["item_code"].isin(codes)
+    if yrs is not None:
+        keep &= df["year"].isin(yrs)
+    df = df[keep]
+    is_export = (df["reported_by"] == "exporter").to_numpy()
+
+    def side(exporter_col: str, importer_col: str, reporter: bool) -> Any:
+        first, second = (exporter_col, importer_col) if reporter else (importer_col, exporter_col)
+        return df[first].where(is_export, df[second]).to_numpy()
+
+    out = pd.DataFrame(
+        {
+            "Reporter Country Code": side("exporter_code", "importer_code", True).astype("int64"),
+            "Reporter Countries": side("exporter", "importer", True).astype(object),
+            "Partner Country Code": side("exporter_code", "importer_code", False).astype("int64"),
+            "Partner Countries": side("exporter", "importer", False).astype(object),
+            "Item Code": df["item_code"].to_numpy(dtype="int64"),
+            "Item": df["item"].to_numpy(dtype=object),
+            "Element Code": pd.Series(is_export).map({True: 5910, False: 5610}).to_numpy("int64"),
+            "Element": pd.Series(is_export)
+            .map({True: "Export quantity", False: "Import quantity"})
+            .to_numpy(object),
+            "Year Code": df["year"].to_numpy(dtype="int64"),
+            "Year": df["year"].to_numpy(dtype="int64"),
+            "Unit": df["unit"].to_numpy(dtype=object),
+            "Value": df["value"].to_numpy(dtype="float64"),
+            "Flag": df["flag"].to_numpy(dtype=object),
+        }
+    )
+    order = ["Item", "Year", "Reporter Countries", "Partner Countries", "Element"]
+    return out.sort_values(order, kind="mergesort").reset_index(drop=True)
 
 
 @functools.cache

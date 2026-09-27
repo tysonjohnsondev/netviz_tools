@@ -71,6 +71,38 @@ def test_load_sample_defaults_and_details() -> None:
     assert {"item_code", "exporter_code", "importer_code", "flag"} <= set(df.columns)
 
 
+def test_raw_sample_layout() -> None:
+    raw = faostat.raw_sample(items=["Wheat", "Maize (corn)"], years=[2021, 2022])
+    assert raw.columns.tolist() == [
+        "Reporter Country Code",
+        "Reporter Countries",
+        "Partner Country Code",
+        "Partner Countries",
+        "Item Code",
+        "Item",
+        "Element Code",
+        "Element",
+        "Year Code",
+        "Year",
+        "Unit",
+        "Value",
+        "Flag",
+    ]
+    assert set(raw["Year"]) == {2021, 2022}
+    assert set(raw["Item"]) == {"Wheat", "Maize (corn)"}
+    assert set(zip(raw["Element Code"], raw["Element"], strict=True)) == {
+        (5910, "Export quantity"),
+        (5610, "Import quantity"),
+    }
+    assert set(raw["Unit"]) == {"t"}
+    # The Russian Federation reports wheat exports in 2021 and none in 2022.
+    ru = raw[(raw["Reporter Countries"] == "Russian Federation") & (raw["Item"] == "Wheat")]
+    assert set(ru.loc[ru["Element"] == "Export quantity", "Year"]) == {2021}
+    assert len(faostat.raw_sample()) == len(pd.read_parquet(faostat._sample_path()))
+    with pytest.raises(nv.UnknownItemError):
+        faostat.raw_sample(items="Rice")
+
+
 def test_reporter_perspectives_on_sample() -> None:
     def russia(reporter: faostat.Reporter) -> float:
         df = faostat.load_sample(items=15, years=2022, reporter=reporter)
