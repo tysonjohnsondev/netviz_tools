@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, Literal, TypeAlias
+from dataclasses import dataclass
+from typing import Any, Final, Literal, TypeAlias
 
 import networkx as nx
 import numpy as np
@@ -24,18 +24,22 @@ from netviz_tools.plot._data import Frames
 from netviz_tools.plot._resolve import (
     Categories,
     EdgeSpec,
-    NodeSpec,
     NodeValues,
     categories,
     edge_values,
+    is_numeric,
     metric_label,
     node_values,
 )
 from netviz_tools.plot._style import (
+    ARROW,
     EDGE_COLOR,
     EDGE_FOCUS_COLOR,
+    EN_DASH,
     MISSING_COLOR,
     MISSING_LABEL,
+    OTHER_COLOR,
+    OTHER_LABEL,
     SEQUENTIAL,
     SURFACE,
     TEXT_COLOR,
@@ -43,59 +47,88 @@ from netviz_tools.plot._style import (
     base_layout,
     default_title,
     fmt,
+    lower_label,
     rgba,
     sample_sequential,
 )
 
-Position: TypeAlias = Mapping[Hashable, tuple[float, float]]
+Position: TypeAlias = dict[Hashable, tuple[float, float]]
+Edge: TypeAlias = tuple[Hashable, Hashable, Mapping[str, Any]]
+EdgeSubset: TypeAlias = Mapping[Hashable, list[tuple[Hashable, Hashable]]]
 ShowLabels: TypeAlias = "bool | int | Sequence[Hashable] | Literal['auto']"
 """``"auto"`` labels every node when there are at most 30, otherwise the 12
 largest; an int labels that many of the largest nodes; ``True``/``False`` all
 or none; a sequence labels exactly those nodes. Focus nodes are always
 labelled."""
 
-_N_WIDTH_BUCKETS = 5
-_ARROW_AT = 0.62
-_MAX_HOVER_ATTRS = 6
+_AUTO_LABEL_ALL: Final = 30
+_AUTO_LABEL_TOP: Final = 12
+_N_WIDTH_BUCKETS: Final = 5
+_N_COLOR_BINS: Final = 5
+_EDGE_WIDTH_RANGE: Final = (0.5, 6.0)
+_ARROW_AT: Final = 0.62
+_MAX_HOVER_ATTRS: Final = 6
+_FADED_NODE_OPACITY: Final = 0.45
+_CAPTION_COLOR: Final = "#6b6a66"
 
 
-@dataclass
+@dataclass(frozen=True, eq=False)
 class Scene:
-    """Everything needed to draw one or more frames."""
+    """Everything needed to draw one or more frames, resolved once for all of them."""
 
     frames: Frames
     nodes: list[Hashable]
-    pos: dict[Hashable, tuple[float, float]]
+    pos: Position
     geo: bool
     directed: bool
-    labels: dict[str, str]
-    unit: str
+    focus: frozenset[Hashable]
+    text: dict[Hashable, str]
     size: NodeValues | None
-    color: NodeValues | None
-    cats: Categories | None
+    size_by_frame: dict[Hashable, pd.Series]
     size_scaler: Scaler | None
+    size_range: tuple[float, float]
+    color: NodeValues | None
+    color_by_frame: dict[Hashable, pd.Series]
     color_scaler: Scaler | None
+    cats: Categories | None
+    edge_subset: EdgeSubset | None
     width_spec: EdgeSpec
     width_scaler: Scaler | None
-    edge_color_spec: EdgeSpec
-    edge_cats: Categories | None
-    edge_color_scaler: Scaler | None
-    text: dict[Hashable, str]
-    focus: set[Hashable]
     min_weight: float | None
-    edge_filter: Callable[[nx.Graph[Any], Hashable], list[tuple[Hashable, Hashable]]] | None
-    size_range: tuple[float, float]
-    partition: pd.Series | None
-    seed: int
-    size_spec: NodeSpec
-    color_spec: NodeSpec
-    edge_width_range: tuple[float, float] = (0.5, 6.0)
-    per_frame_size: dict[Hashable, pd.Series] = field(default_factory=dict)
-    per_frame_color: dict[Hashable, pd.Series] = field(default_factory=dict)
+    edge_color_spec: EdgeSpec
+    edge_color_scaler: Scaler | None
+    edge_cats: Categories | None
+
+    @property
+    def labels(self) -> dict[str, str]:
+        """Display labels."""
+        return self.frames.labels
+
+    @property
+    def unit(self) -> str:
+        """Unit of the edge weights."""
+        return self.frames.unit
+
+
+GroupKey: TypeAlias = tuple[str, int, bool]
+"""Edge line group: (colour key, width bucket, touches a focus node)."""
+
+
+@dataclass(frozen=True, eq=False)
+class FrameEdges:
+    """The edges drawn in one period, with their group, width value and colour value."""
+
+    edges: list[Edge]
+    groups: list[GroupKey]
+    widths: list[float]
+    colors: list[Any]
 
 
 def resolve_focus(g: nx.Graph[Any], focus: Hashable | Iterable[Hashable] | None) -> list[Hashable]:
-    """Normalize ``focus`` into a list of nodes that exist in ``g``."""
+    """Normalize ``focus`` into a list of nodes that exist in ``g``.
+
+    Strings, numbers and tuples are single nodes; other iterables hold several.
+    """
     if focus is None:
         return []
     items = (
@@ -112,14 +145,14 @@ def resolve_focus(g: nx.Graph[Any], focus: Hashable | Iterable[Hashable] | None)
 
 
 def labelled_nodes(
-    nodes: Sequence[Hashable], show: Any, focus: Iterable[Hashable]
+    nodes: Sequence[Hashable], show: ShowLabels, focus: Iterable[Hashable]
 ) -> set[Hashable]:
     """Apply the :data:`ShowLabels` rule to nodes ordered largest first."""
     if show == "auto":
-        chosen = set(nodes) if len(nodes) <= 30 else set(nodes[:12])
+        chosen = set(nodes) if len(nodes) <= _AUTO_LABEL_ALL else set(nodes[:_AUTO_LABEL_TOP])
     elif show is True:
         chosen = set(nodes)
-    elif show is False or show is None:
+    elif show is False:
         chosen = set()
     elif isinstance(show, int):
         chosen = set(nodes[:show])
@@ -128,8 +161,7 @@ def labelled_nodes(
     return chosen | set(focus)
 
 
-def label_text(g: nx.Graph[Any], label_by: str | None) -> Callable[[Hashable], str]:
-    """Return a function giving the display text of a node."""
+def _label_text(g: nx.Graph[Any], label_by: str | None) -> Callable[[Hashable], str]:
     if label_by is None:
         return str
 
@@ -140,285 +172,271 @@ def label_text(g: nx.Graph[Any], label_by: str | None) -> Callable[[Hashable], s
     return text
 
 
+def _frame_values(frames: Frames, g: nx.Graph[Any], resolved: NodeValues) -> pd.Series:
+    """Values for one period: metrics are recomputed, attributes and mappings are not."""
+    if not frames.animated or not resolved.metric or resolved.categorical:
+        return resolved.series
+    vals = node_values(g, resolved.name, arg="size_by", labels=frames.labels)
+    assert vals is not None  # a metric name always resolves
+    return vals.series
+
+
+def _numeric_scaler(
+    per_frame: Mapping[Hashable, pd.Series], nodes: list[Hashable], lo: float, hi: float
+) -> Scaler:
+    allv = np.concatenate([s.reindex(nodes).to_numpy(dtype=float) for s in per_frame.values()])
+    return Scaler(allv, lo, hi)
+
+
+def _all_edges(
+    frames: Frames, nodes: list[Hashable], edge_subset: EdgeSubset | None
+) -> dict[Hashable, list[Edge]]:
+    node_set = set(nodes)
+    out: dict[Hashable, list[Edge]] = {}
+    for key, g in frames.graphs.items():
+        if edge_subset is not None:
+            out[key] = [(a, b, g[a][b]) for a, b in edge_subset[key]]
+        else:
+            out[key] = [
+                (a, b, d) for a, b, d in g.edges(data=True) if a in node_set and b in node_set
+            ]
+    return out
+
+
 def prepare(
     frames: Frames,
     *,
     nodes: list[Hashable],
-    pos: dict[Hashable, tuple[float, float]],
+    pos: Position,
     geo: bool,
-    size_by: NodeSpec,
-    color_by: NodeSpec,
+    size: NodeValues | None,
+    color: NodeValues | None,
     edge_width_by: EdgeSpec,
     edge_color_by: EdgeSpec,
     label_by: str | None,
-    show_labels: Any,
-    focus: list[Hashable],
-    partition: pd.Series | None,
-    seed: int,
+    show_labels: ShowLabels,
+    focus: Iterable[Hashable],
     size_range: tuple[float, float],
     min_weight_quantile: float | None = None,
-    edge_filter: Callable[[nx.Graph[Any], Hashable], list[tuple[Hashable, Hashable]]] | None = None,
-    union: nx.Graph[Any] | None = None,
-    resolved: tuple[NodeValues | None, NodeValues | None] | None = None,
+    edge_subset: EdgeSubset | None = None,
 ) -> Scene:
-    """Resolve values and scales shared by all frames.
+    """Resolve the values and scales shared by all frames.
 
-    ``resolved`` passes already computed ``(size, color)`` values for the
-    union graph, so expensive metrics are not computed twice.
+    ``size`` and ``color`` are node values already resolved on the union of
+    all periods. Metrics are recomputed per period, and every scale spans all
+    periods, so frames are comparable. ``edge_subset`` restricts the edges
+    drawn in each period (by period key); by default every edge between two
+    drawn nodes is drawn.
     """
-    u = union if union is not None else frames.union()
-    labels = frames.labels
-    if resolved is not None:
-        size, color = resolved
-    else:
-        size = node_values(u, size_by, arg="size_by", labels=labels, partition=partition, seed=seed)
-        color = node_values(
-            u, color_by, arg="color_by", labels=labels, partition=partition, seed=seed
-        )
+    union = frames.union
+    directed = union.is_directed()
+    focus = list(focus)
     cats = (
-        categories(color.values.reindex(nodes), name=color.name)
-        if color and color.categorical
+        categories(color.series.reindex(nodes), name=color.name)
+        if color is not None and color.categorical
         else None
     )
-
-    scene = Scene(
-        frames=frames,
-        nodes=nodes,
-        pos=pos,
-        geo=geo,
-        directed=u.is_directed(),
-        labels=labels,
-        unit=frames.unit,
-        size=size,
-        color=color,
-        cats=cats,
-        size_scaler=None,
-        color_scaler=None,
-        width_spec=edge_width_by,
-        width_scaler=None,
-        edge_color_spec=edge_color_by,
-        edge_cats=None,
-        edge_color_scaler=None,
-        text={},
-        focus=set(focus),
-        min_weight=None,
-        edge_filter=edge_filter,
-        size_range=size_range,
-        partition=partition,
-        seed=seed,
-        size_spec=size_by,
-        color_spec=color_by,
-    )
-    # Per-frame values for metrics that change between periods.
+    size_by_frame: dict[Hashable, pd.Series] = {}
+    color_by_frame: dict[Hashable, pd.Series] = {}
     for key, g in frames.graphs.items():
-        scene.per_frame_size[key] = _frame_values(scene, g, size, size_by, "size_by")
+        if size is not None:
+            size_by_frame[key] = _frame_values(frames, g, size)
         if color is not None and not color.categorical:
-            scene.per_frame_color[key] = _frame_values(scene, g, color, color_by, "color_by")
-    if size is not None and not size.categorical:
-        allv = np.concatenate(
-            [s.reindex(nodes).to_numpy(float) for s in scene.per_frame_size.values()]
-        )
-        scene.size_scaler = Scaler(allv, *size_range)
-    if color is not None and not color.categorical:
-        allc = np.concatenate(
-            [s.reindex(nodes).to_numpy(float) for s in scene.per_frame_color.values()]
-        )
-        scene.color_scaler = Scaler(allc, 0.0, 1.0)
+            color_by_frame[key] = _frame_values(frames, g, color)
+    size_scaler = (
+        _numeric_scaler(size_by_frame, nodes, *size_range)
+        if size is not None and not size.categorical
+        else None
+    )
+    color_scaler = _numeric_scaler(color_by_frame, nodes, 0.0, 1.0) if color_by_frame else None
 
     # Edge widths and colours, scaled across all frames.
     widths: list[float] = []
     ecolors: list[Any] = []
-    node_set = set(nodes)
-    for key, g in frames.graphs.items():
-        edges = _frame_edges(scene, g, key, node_set, apply_cut=False)
-        w = edge_values(edges, edge_width_by, arg="edge_width_by", directed=scene.directed)
+    for edges in _all_edges(frames, nodes, edge_subset).values():
+        w = edge_values(edges, edge_width_by, arg="edge_width_by", directed=directed)
         if w is not None:
             widths.extend(pd.to_numeric(w, errors="coerce").tolist())
-        if edge_color_by not in (None, "source", "target"):
-            c = edge_values(edges, edge_color_by, arg="edge_color_by", directed=scene.directed)
+        if edge_color_by not in ("source", "target"):
+            c = edge_values(edges, edge_color_by, arg="edge_color_by", directed=directed)
             if c is not None:
                 ecolors.extend(c.tolist())
-    if widths:
-        arr = np.asarray(widths, dtype=float)
-        scene.width_scaler = Scaler(arr, *scene.edge_width_range)
-        if min_weight_quantile is not None and np.isfinite(arr).any():
-            scene.min_weight = float(np.nanquantile(arr, min_weight_quantile))
+    width_scaler = Scaler(widths, *_EDGE_WIDTH_RANGE) if widths else None
+    min_weight = None
+    if widths and min_weight_quantile is not None and np.isfinite(widths).any():
+        min_weight = float(np.nanquantile(np.asarray(widths, dtype=float), min_weight_quantile))
+    edge_color_scaler = None
+    edge_cats = None
     if ecolors:
         es = pd.Series(ecolors, dtype=object)
-        if all(isinstance(v, int | float) and not isinstance(v, bool) for v in es.dropna()):
-            scene.edge_color_scaler = Scaler(es.astype(float), 0.0, 1.0)
+        if is_numeric(es):
+            edge_color_scaler = Scaler(es.astype(float), 0.0, 1.0)
         else:
-            scene.edge_cats = categories(es, name=str(edge_color_by))
+            edge_cats = categories(es, name=str(edge_color_by))
 
-    text_of = label_text(u, label_by)
+    text_of = _label_text(union, label_by)
     shown = labelled_nodes(nodes, show_labels, focus)
-    scene.text = {n: text_of(n) for n in nodes if n in shown}
-    return scene
-
-
-def _frame_values(
-    scene: Scene, g: nx.Graph[Any], resolved: NodeValues | None, spec: NodeSpec, arg: str
-) -> pd.Series:
-    if resolved is None:
-        return pd.Series(dtype=float)
-    if not scene.frames.animated or resolved.categorical:
-        return resolved.values
-    is_attr = isinstance(spec, str) and any(resolved.name in d for _, d in g.nodes(data=True))
-    if not isinstance(spec, str) or (is_attr and resolved.name not in ("community",)):
-        return resolved.values
-    vals = node_values(
-        g, resolved.name, arg=arg, labels=scene.labels, partition=scene.partition, seed=scene.seed
+    return Scene(
+        frames=frames,
+        nodes=nodes,
+        pos=pos,
+        geo=geo,
+        directed=directed,
+        focus=frozenset(focus),
+        text={n: text_of(n) for n in nodes if n in shown},
+        size=size,
+        size_by_frame=size_by_frame,
+        size_scaler=size_scaler,
+        size_range=size_range,
+        color=color,
+        color_by_frame=color_by_frame,
+        color_scaler=color_scaler,
+        cats=cats,
+        edge_subset=edge_subset,
+        width_spec=edge_width_by,
+        width_scaler=width_scaler,
+        min_weight=min_weight,
+        edge_color_spec=edge_color_by,
+        edge_color_scaler=edge_color_scaler,
+        edge_cats=edge_cats,
     )
-    assert vals is not None
-    return vals.values
-
-
-def _frame_edges(
-    scene: Scene, g: nx.Graph[Any], key: Hashable, node_set: set[Hashable], *, apply_cut: bool
-) -> list[tuple[Hashable, Hashable, dict[str, Any]]]:
-    if scene.edge_filter is not None:
-        pairs = scene.edge_filter(g, key)
-        edges = [(a, b, g[a][b]) for a, b in pairs]
-    else:
-        edges = [(a, b, d) for a, b, d in g.edges(data=True) if a in node_set and b in node_set]
-    if apply_cut and scene.min_weight is not None:
-        w = edge_values(edges, scene.width_spec, arg="edge_width_by", directed=scene.directed)
-        if w is not None:
-            keep = pd.to_numeric(w, errors="coerce").fillna(-np.inf).to_numpy() >= scene.min_weight
-            edges = [e for e, k in zip(edges, keep, strict=True) if k]
-    return edges
 
 
 def _node_color(scene: Scene, n: Hashable, key: Hashable) -> str:
+    """Colour of node ``n`` in period ``key`` (used by ``edge_color_by="source"``)."""
     if scene.cats is not None:
         return scene.cats.colors[str(scene.cats.labels.get(n))]
-    if scene.color is not None and scene.color_scaler is not None:
-        vals = scene.per_frame_color.get(key, scene.color.values)
-        v = vals.get(n, np.nan)
-        return (
-            MISSING_COLOR
-            if pd.isna(v)
-            else sample_sequential(float(scene.color_scaler.unit([v])[0]))
-        )
+    if scene.color_scaler is not None:
+        v = scene.color_by_frame[key].get(n, np.nan)
+        if pd.isna(v):
+            return MISSING_COLOR
+        return sample_sequential(float(scene.color_scaler.unit([v])[0]))
     return SEQUENTIAL[3][1]
 
 
-def _edge_groups(
-    scene: Scene, g: nx.Graph[Any], key: Hashable
-) -> tuple[
-    list[tuple[Hashable, Hashable, dict[str, Any]]],
-    list[tuple[str, int, bool]],
-    list[float],
-    list[Any],
-]:
-    node_set = set(scene.nodes)
-    edges = _frame_edges(scene, g, key, node_set, apply_cut=True)
+def _is_missing(v: Any) -> bool:
+    return v is None or (isinstance(v, float) and math.isnan(v))
+
+
+def _frame_edges(scene: Scene, key: Hashable, edges: list[Edge]) -> FrameEdges:
+    """Drop edges below the weight cut, then group the rest by colour and width."""
     w = edge_values(edges, scene.width_spec, arg="edge_width_by", directed=scene.directed)
-    wvals = pd.to_numeric(w, errors="coerce").tolist() if w is not None else [math.nan] * len(edges)
-    if w is not None and scene.width_scaler is not None:
-        t = np.nan_to_num(scene.width_scaler.unit(wvals), nan=0.0)
+    if w is not None and scene.min_weight is not None:
+        keep = pd.to_numeric(w, errors="coerce").fillna(-np.inf).to_numpy() >= scene.min_weight
+        edges = [e for e, k in zip(edges, keep, strict=True) if k]
+        w = w[keep].reset_index(drop=True)
+    widths = (
+        pd.to_numeric(w, errors="coerce").tolist() if w is not None else [math.nan] * len(edges)
+    )
+    if scene.width_scaler is not None:
+        t = np.nan_to_num(scene.width_scaler.unit(widths), nan=0.0)
         buckets = np.minimum((t * _N_WIDTH_BUCKETS).astype(int), _N_WIDTH_BUCKETS - 1).tolist()
     else:
         buckets = [1] * len(edges)
-    spec = scene.edge_color_spec
-    cvals: list[Any] = [None] * len(edges)
-    ckeys: list[str] = []
-    if spec in ("source", "target"):
-        idx = 0 if spec == "source" else 1
-        for e in edges:
-            ckeys.append("node:" + _node_color(scene, e[idx], key))
-    elif spec is not None:
-        c = edge_values(edges, spec, arg="edge_color_by", directed=scene.directed)
-        cvals = c.tolist() if c is not None else cvals
-        for v in cvals:
-            if v is None or (isinstance(v, float) and math.isnan(v)):
-                ckeys.append("missing")
-            elif scene.edge_color_scaler is not None:
-                b = int(min(float(scene.edge_color_scaler.unit([v])[0]) * 5, 4))
-                ckeys.append(f"bin:{b}")
-            else:
-                ckeys.append("cat:" + _edge_cat_label(scene, v))
+    colors: list[Any] = [None] * len(edges)
+    cspec = scene.edge_color_spec
+    if cspec == "source":
+        ckeys = ["node:" + _node_color(scene, u, key) for u, _, _ in edges]
+    elif cspec == "target":
+        ckeys = ["node:" + _node_color(scene, v, key) for _, v, _ in edges]
+    elif cspec is not None:
+        c = edge_values(edges, cspec, arg="edge_color_by", directed=scene.directed)
+        colors = c.tolist() if c is not None else colors
+        ckeys = [_edge_color_key(scene, v) for v in colors]
     else:
         ckeys = ["base"] * len(edges)
+    focus = scene.focus
     groups = [
-        (ck, b, bool(scene.focus) and (e[0] in scene.focus or e[1] in scene.focus))
-        for ck, b, e in zip(ckeys, buckets, edges, strict=True)
+        (ck, b, bool(focus) and (u in focus or v in focus))
+        for ck, b, (u, v, _) in zip(ckeys, buckets, edges, strict=True)
     ]
-    return edges, groups, wvals, cvals
+    return FrameEdges(edges, groups, widths, colors)
 
 
-def _edge_cat_label(scene: Scene, v: Any) -> str:
+def _edge_color_key(scene: Scene, v: Any) -> str:
+    if _is_missing(v):
+        return "missing"
+    if scene.edge_color_scaler is not None:
+        t = float(scene.edge_color_scaler.unit([v])[0])
+        return f"bin:{min(int(t * _N_COLOR_BINS), _N_COLOR_BINS - 1)}"
     assert scene.edge_cats is not None
     label = str(v)
-    return label if label in scene.edge_cats.colors else "Other"
+    return "cat:" + (label if label in scene.edge_cats.colors else OTHER_LABEL)
 
 
 def _group_style(scene: Scene, ck: str, focused: bool) -> tuple[str, str, bool]:
     """Return (colour, legend name, show in legend) for an edge colour key."""
-    if focused and ck == "base":
-        return EDGE_FOCUS_COLOR, "", False
     if ck == "base":
-        return EDGE_COLOR if not scene.focus else rgba("#6e6e6e", 0.18), "", False
+        if focused:
+            return EDGE_FOCUS_COLOR, "", False
+        return (rgba("#6e6e6e", 0.18) if scene.focus else EDGE_COLOR), "", False
     if ck == "missing":
-        return rgba(MISSING_COLOR[:7], 0.6), MISSING_LABEL, True
+        return rgba(MISSING_COLOR, 0.6), MISSING_LABEL, True
     alpha = 0.8 if focused or not scene.focus else 0.25
     if ck.startswith("node:"):
         return rgba(ck[5:], alpha * 0.7), "", False
     if ck.startswith("bin:"):
         b = int(ck[4:])
-        assert scene.edge_color_scaler is not None
-        return rgba(sample_sequential((b + 0.5) / 5), alpha), f"{_bin_label(scene, b)}", True
+        color = sample_sequential((b + 0.5) / _N_COLOR_BINS)
+        return rgba(color, alpha), _bin_label(scene, b), True
     assert scene.edge_cats is not None
     name = ck[4:]
-    return rgba(scene.edge_cats.colors.get(name, "#8a8986"), alpha), name, True
+    return rgba(scene.edge_cats.colors.get(name, OTHER_COLOR), alpha), name, True
 
 
 def _bin_label(scene: Scene, b: int) -> str:
     s = scene.edge_color_scaler
     assert s is not None
-    lo_t, hi_t = s.vmin + (s.vmax - s.vmin) * b / 5, s.vmin + (s.vmax - s.vmin) * (b + 1) / 5
-    inv = (lambda t: 10**t - 1) if s.log else (lambda t: t)
-    return f"{fmt(inv(lo_t))} to {fmt(inv(hi_t))}"
+    step = (s.vmax - s.vmin) / _N_COLOR_BINS
+    lo, hi = s.inverse(s.vmin + step * b), s.inverse(s.vmin + step * (b + 1))
+    return f"{fmt(lo)} to {fmt(hi)}"
 
 
-def _xy(scene: Scene) -> tuple[str, str, type[go.Scatter] | type[go.Scattergeo]]:
+def _trace_class(scene: Scene) -> tuple[str, str, type[go.Scatter] | type[go.Scattergeo]]:
     return ("lon", "lat", go.Scattergeo) if scene.geo else ("x", "y", go.Scatter)
 
 
-def frame_traces(scene: Scene, key: Hashable, group_keys: list[tuple[str, int, bool]]) -> list[Any]:
-    """Build the traces of one frame, in a fixed order."""
+def _line_width(bucket: int) -> float:
+    lo, hi = _EDGE_WIDTH_RANGE
+    return lo + (bucket + 0.5) / _N_WIDTH_BUCKETS * (hi - lo)
+
+
+def frame_traces(
+    scene: Scene, key: Hashable, fe: FrameEdges, group_keys: list[GroupKey]
+) -> list[Any]:
+    """Build the traces of one frame, in a fixed order.
+
+    One line trace per edge group (empty when the group has no edge in this
+    period), the edge hover/arrow markers, self-loops (not on maps), then
+    the node traces.
+    """
     g = scene.frames.graphs[key]
-    xk, yk, cls = _xy(scene)
-    traces: list[Any] = []
-    edges, groups, wvals, cvals = _edge_groups(scene, g, key)
+    xk, yk, cls = _trace_class(scene)
     pos = scene.pos
-    seen_legend: set[str] = set()
+    traces: list[Any] = []
+    in_legend: set[str] = set()
     for gk in group_keys:
-        ck, b, focused = gk
+        ck, bucket, focused = gk
         xs: list[float | None] = []
         ys: list[float | None] = []
-        for (u, v, _), grp in zip(edges, groups, strict=True):
+        for (u, v, _), grp in zip(fe.edges, fe.groups, strict=True):
             if grp == gk and u != v:
                 xs += [pos[u][0], pos[v][0], None]
                 ys += [pos[u][1], pos[v][1], None]
         color, name, legend = _group_style(scene, ck, focused)
-        width = scene.edge_width_range[0] + (b + 0.5) / _N_WIDTH_BUCKETS * (
-            scene.edge_width_range[1] - scene.edge_width_range[0]
-        )
-        show = legend and ck not in seen_legend
-        seen_legend.add(ck)
         traces.append(
             cls(
                 **{xk: xs, yk: ys},
                 mode="lines",
-                line={"width": width, "color": color},
+                line={"width": _line_width(bucket), "color": color},
                 hoverinfo="skip",
-                name=name or f"edges {ck} {b}",
+                name=name or "edge lines",
                 legendgroup=f"edge-{ck}",
-                showlegend=show,
+                showlegend=legend and ck not in in_legend,
             )
         )
-    traces.append(_edge_hover_trace(scene, edges, wvals, cvals, key))
+        in_legend.add(ck)
+    traces.append(_edge_markers(scene, fe))
     if not scene.geo:
         traces.append(_self_loop_trace(scene, g))
     traces.extend(_node_traces(scene, g, key))
@@ -426,58 +444,53 @@ def frame_traces(scene: Scene, key: Hashable, group_keys: list[tuple[str, int, b
 
 
 def _edge_text(scene: Scene, u: Hashable, v: Hashable, w: float, c: Any) -> str:
-    lab = scene.labels
-    arrow = "→" if scene.directed else "–"
-    lines = [f"{u} {arrow} {v}"]
-    if isinstance(scene.width_spec, str) and not math.isnan(w):
-        name = lab["weight"] if scene.width_spec == "weight" else scene.width_spec.replace("_", " ")
-        unit = scene.unit if scene.width_spec == "weight" else ""
-        lines.append(f"{name}: {fmt(w, unit)}")
-    elif not math.isnan(w):
-        lines.append(f"value: {fmt(w)}")
-    if (
-        isinstance(scene.edge_color_spec, str)
-        and scene.edge_color_spec not in ("source", "target")
-        and c is not None
-    ):
-        lines.append(
-            f"{scene.edge_color_spec.replace('_', ' ')}: {c if isinstance(c, str) else fmt(float(c))}"
-        )
+    lines = [f"{u} {ARROW if scene.directed else EN_DASH} {v}"]
+    spec = scene.width_spec
+    if not math.isnan(w):
+        if spec == "weight":
+            lines.append(f"{scene.labels['weight']}: {fmt(w, scene.unit)}")
+        elif isinstance(spec, str):
+            lines.append(f"{spec.replace('_', ' ')}: {fmt(w)}")
+        else:
+            lines.append(f"value: {fmt(w)}")
+    cspec = scene.edge_color_spec
+    if isinstance(cspec, str) and cspec not in ("source", "target", spec) and not _is_missing(c):
+        lines.append(f"{cspec.replace('_', ' ')}: {c if isinstance(c, str) else fmt(float(c))}")
     return "<br>".join(lines)
 
 
-def _edge_hover_trace(
-    scene: Scene,
-    edges: list[tuple[Hashable, Hashable, dict[str, Any]]],
-    wvals: list[float],
-    cvals: list[Any],
-    key: Hashable,
-) -> Any:
-    xk, yk, cls = _xy(scene)
+def _edge_markers(scene: Scene, fe: FrameEdges) -> Any:
+    """Hover targets on the edges; on a directed node-link diagram, also arrowheads."""
+    xk, yk, cls = _trace_class(scene)
     pos = scene.pos
-    real = [(e, w, c) for e, w, c in zip(edges, wvals, cvals, strict=True) if e[0] != e[1]]
+    real = [
+        (u, v, w, c)
+        for (u, v, _), w, c in zip(fe.edges, fe.widths, fe.colors, strict=True)
+        if u != v
+    ]
     t = _ARROW_AT if scene.directed else 0.5
-    xs = [pos[u][0] + t * (pos[v][0] - pos[u][0]) for (u, v, _), _, _ in real]
-    ys = [pos[u][1] + t * (pos[v][1] - pos[u][1]) for (u, v, _), _, _ in real]
-    text = [_edge_text(scene, u, v, w, c) for (u, v, _), w, c in real]
+    xs = [pos[u][0] + t * (pos[v][0] - pos[u][0]) for u, v, _, _ in real]
+    ys = [pos[u][1] + t * (pos[v][1] - pos[u][1]) for u, v, _, _ in real]
+    text = [_edge_text(scene, u, v, w, c) for u, v, w, c in real]
     marker: dict[str, Any]
     if scene.directed and not scene.geo:
+        # Plotly rotates markers clockwise from "up", so the angle of the
+        # direction (dx, dy) is atan2(dx, dy). The y axis is scale-anchored
+        # to x, so screen angles equal data angles.
         angles = [
             math.degrees(math.atan2(pos[v][0] - pos[u][0], pos[v][1] - pos[u][1]))
-            for (u, v, _), _, _ in real
+            for u, v, _, _ in real
         ]
         if scene.width_scaler is not None:
-            sizes = (
-                7 + 5 * np.nan_to_num(scene.width_scaler.unit([w for _, w, _ in real]), nan=0.0)
-            ).tolist()
+            unit = np.nan_to_num(scene.width_scaler.unit([w for _, _, w, _ in real]), nan=0.0)
+            sizes = (7 + 5 * unit).tolist()
         else:
             sizes = [8.0] * len(real)
-        faded = bool(scene.focus)
         colors = [
             "rgba(60, 60, 60, 0.85)"
-            if not faded or u in scene.focus or v in scene.focus
+            if not scene.focus or u in scene.focus or v in scene.focus
             else "rgba(110, 110, 110, 0.25)"
-            for (u, v, _), _, _ in real
+            for u, v, _, _ in real
         ]
         marker = {
             "symbol": "triangle-up",
@@ -502,18 +515,15 @@ def _edge_hover_trace(
 def _self_loop_trace(scene: Scene, g: nx.Graph[Any]) -> go.Scatter:
     xs: list[float | None] = []
     ys: list[float | None] = []
-    if scene.pos:
+    loops = [n for n in nx.nodes_with_selfloops(g) if n in scene.pos]
+    if loops:
         arr = np.asarray(list(scene.pos.values()), dtype=float)
         r = 0.025 * float(max(np.ptp(arr[:, 0]), np.ptp(arr[:, 1]), 1e-9))
-    else:
-        r = 0.0
-    node_set = set(scene.nodes)
-    theta = np.linspace(0, 2 * math.pi, 17)
-    for n in nx.nodes_with_selfloops(g):
-        if n in node_set:
+        theta = np.linspace(0, 2 * math.pi, 17)
+        for n in loops:
             x0, y0 = scene.pos[n]
-            xs += (x0 + r * np.sin(theta)).tolist() + [None]
-            ys += (y0 + r + r * np.cos(theta)).tolist() + [None]
+            xs += [*(x0 + r * np.sin(theta)).tolist(), None]
+            ys += [*(y0 + r + r * np.cos(theta)).tolist(), None]
     return go.Scatter(
         x=xs,
         y=ys,
@@ -526,7 +536,7 @@ def _self_loop_trace(scene: Scene, g: nx.Graph[Any]) -> go.Scatter:
 
 
 def _hover(
-    scene: Scene, g: nx.Graph[Any], n: Hashable, key: Hashable, size_v: float, color_v: Any
+    scene: Scene, g: nx.Graph[Any], n: Hashable, key: Hashable, size_v: Any, color_v: Any
 ) -> str:
     lab = scene.labels
     lines = [f"<b>{n}</b>"]
@@ -537,18 +547,16 @@ def _hover(
         return "<br>".join(lines)
     shown: set[str] = set()
     if scene.color is not None:
-        v = color_v
         if scene.cats is not None:
             text = str(scene.cats.labels.get(n))
         else:
-            text = fmt(float(v), scene.unit if scene.color.in_weight_units else "")
+            text = fmt(float(color_v), scene.unit if scene.color.in_weight_units else "")
         lines.append(f"{scene.color.label}: {text}")
         shown.add(scene.color.name)
     if scene.size is not None and scene.size.name not in shown:
         unit = scene.unit if scene.size.in_weight_units else ""
-        lines.append(
-            f"{scene.size.label}: {fmt(size_v, unit) if not isinstance(size_v, str) else size_v}"
-        )
+        text = str(size_v) if scene.size.categorical else fmt(float(size_v), unit)
+        lines.append(f"{scene.size.label}: {text}")
         shown.add(scene.size.name)
     if "degree" not in shown:
         lines.append(f"{metric_label('degree', lab, directed=scene.directed)}: {g.degree(n)}")
@@ -557,7 +565,7 @@ def _hover(
     extra = [
         (k, v)
         for k, v in g.nodes[n].items()
-        if k not in shown and isinstance(v, str | int | float | bool) and k not in ("lon", "lat")
+        if k not in shown and k not in ("lon", "lat") and isinstance(v, str | int | float | bool)
     ]
     for k, v in extra[:_MAX_HOVER_ATTRS]:
         lines.append(f"{lab.get(k, k.replace('_', ' '))}: {fmt(v) if isinstance(v, float) else v}")
@@ -565,166 +573,150 @@ def _hover(
 
 
 def _node_traces(scene: Scene, g: nx.Graph[Any], key: Hashable) -> list[Any]:
-    xk, yk, cls = _xy(scene)
+    xk, yk, cls = _trace_class(scene)
     nodes = scene.nodes
-    size_s = scene.per_frame_size.get(key, pd.Series(dtype=float))
     lo, hi = scene.size_range
-    if scene.size_scaler is not None:
-        sv = size_s.reindex(nodes).to_numpy(dtype=float)
-        sizes = dict(zip(nodes, scene.size_scaler(sv), strict=True))
-        size_val = dict(zip(nodes, sv, strict=True))
+    size_vals: dict[Hashable, Any]
+    if scene.size is None:
+        sizes = dict.fromkeys(nodes, (lo + hi) / 2)
+        size_vals = {}
+    elif scene.size_scaler is None:  # categorical size_by: equal sizes, value in the hover
+        sizes = dict.fromkeys(nodes, hi * 0.6)
+        size_vals = scene.size.series.reindex(nodes).to_dict()
     else:
-        mid = (lo + hi) / 2 if scene.size is None else hi * 0.6
-        sizes = dict.fromkeys(nodes, mid)
-        size_val = {
-            n: (str(scene.size.values.get(n)) if scene.size is not None else math.nan)
-            for n in nodes
-        }
-    present = {n: n in g for n in nodes}
+        sv = scene.size_by_frame[key].reindex(nodes).to_numpy(dtype=float)
+        sizes = dict(zip(nodes, scene.size_scaler(sv).tolist(), strict=True))
+        size_vals = dict(zip(nodes, sv.tolist(), strict=True))
     for n in nodes:
-        if not present[n]:
+        if n not in g:
             sizes[n] = 0.0
-    color_s = (
-        scene.per_frame_color.get(key)
-        if scene.color is not None and not scene.color.categorical
-        else None
-    )
-    faded = bool(scene.focus)
+    color_vals: dict[Hashable, Any] = {}
+    if scene.color is not None and scene.cats is None:
+        color_vals = scene.color_by_frame[key].reindex(nodes).to_dict()
+    focus = scene.focus
 
-    def marker_line(members: list[Hashable]) -> dict[str, Any]:
-        return {
-            "width": [2.5 if m in scene.focus else 1.0 for m in members],
-            "color": [TEXT_COLOR if m in scene.focus else SURFACE for m in members],
-        }
-
-    def opacity(members: list[Hashable]) -> list[float]:
-        return [1.0 if not faded or m in scene.focus else 0.45 for m in members]
-
-    def trace(
-        members: list[Hashable], marker: dict[str, Any], name: str, legend: bool, group: str
-    ) -> Any:
-        colors = scene.color.values if scene.color is not None else pd.Series(dtype=object)
-        cv = color_s if color_s is not None else colors
+    def trace(members: list[Hashable], marker: dict[str, Any], name: str, legend: bool) -> Any:
         kwargs: dict[str, Any] = {
             xk: [scene.pos[m][0] for m in members],
             yk: [scene.pos[m][1] for m in members],
             "mode": "markers+text",
             "text": [scene.text.get(m, "") for m in members],
             "textposition": "top center",
-            "textfont": {"size": 11, "color": TEXT_COLOR},
             "marker": {
                 "size": [sizes[m] for m in members],
-                "opacity": opacity(members),
-                "line": marker_line(members),
+                "opacity": [
+                    1.0 if not focus or m in focus else _FADED_NODE_OPACITY for m in members
+                ],
+                "line": {
+                    "width": [2.5 if m in focus else 1.0 for m in members],
+                    "color": [TEXT_COLOR if m in focus else SURFACE for m in members],
+                },
                 **marker,
             },
             "hovertext": [
-                _hover(scene, g, m, key, size_val[m], cv.get(m, math.nan)) for m in members
+                _hover(scene, g, m, key, size_vals.get(m), color_vals.get(m)) for m in members
             ],
             "hoverinfo": "text",
             "name": name,
-            "legendgroup": group,
+            "legendgroup": f"node-{name}" if legend else "nodes",
             "showlegend": legend,
         }
-        if scene.geo:
-            del kwargs["textfont"]
+        if not scene.geo:
+            kwargs["textfont"] = {"size": 11, "color": TEXT_COLOR}
         return cls(**kwargs)
 
-    out: list[Any] = []
     if scene.cats is not None:
-        for cat, color in scene.cats.colors.items():
-            members = [n for n in nodes if scene.cats.labels.get(n) == cat]
-            out.append(trace(members, {"color": color}, cat, True, f"node-{cat}"))
-        return out
+        cats = scene.cats
+        return [
+            trace([n for n in nodes if cats.labels.get(n) == cat], {"color": color}, cat, True)
+            for cat, color in cats.colors.items()
+        ]
     if scene.color is not None and scene.color_scaler is not None:
-        assert color_s is not None
-        vals = color_s.reindex(nodes)
-        ok = [n for n in nodes if pd.notna(vals.get(n))]
-        miss = [n for n in nodes if pd.isna(vals.get(n))]
         s = scene.color_scaler
-        tick_t = np.linspace(s.vmin, s.vmax, 5)
-        inv = (lambda t: 10**t - 1) if s.log else (lambda t: t)
+        # Split on the values over all periods, so that every frame has the same
+        # points in the same traces; nodes absent from a period get size 0.
+        overall = scene.color.series
+        miss = [n for n in nodes if pd.isna(overall.get(n))]
+        ok = [n for n in nodes if pd.notna(overall.get(n))]
+        tickvals, ticktext = s.ticks()
         marker = {
-            "color": s._t(vals.reindex(ok).to_numpy(float)).tolist(),
+            "color": np.nan_to_num(s.transform([color_vals[n] for n in ok]), nan=s.vmin).tolist(),
             "cmin": s.vmin,
             "cmax": s.vmax if s.vmax > s.vmin else s.vmin + 1,
             "colorscale": [list(p) for p in SEQUENTIAL],
             "showscale": True,
             "colorbar": {
                 "title": {"text": scene.color.label},
-                "tickvals": tick_t.tolist(),
-                "ticktext": [fmt(inv(t)) for t in tick_t],
+                "tickvals": tickvals,
+                "ticktext": ticktext,
                 "thickness": 14,
                 "len": 0.6,
             },
         }
-        out.append(trace(ok, marker, scene.color.label, False, "nodes"))
-        out.append(
-            trace(miss, {"color": MISSING_COLOR}, MISSING_LABEL, bool(miss), "nodes-missing")
+        missing = trace(miss, {"color": MISSING_COLOR}, MISSING_LABEL, bool(miss))
+        return [trace(ok, marker, scene.color.label, False), missing]
+    return [trace(nodes, {"color": SEQUENTIAL[3][1]}, "nodes", False)]
+
+
+def _caption(scene: Scene) -> str:
+    bits = []
+    if scene.size is not None:
+        bits.append(f"node size: {scene.size.label}")
+    if isinstance(scene.width_spec, str) and scene.width_scaler is not None:
+        name = (
+            scene.labels["weight"]
+            if scene.width_spec == "weight"
+            else scene.width_spec.replace("_", " ")
         )
-        return out
-    out.append(trace(nodes, {"color": SEQUENTIAL[3][1]}, "nodes", False, "nodes"))
-    return out
+        bits.append(f"edge width: {name.lower()}")
+    if scene.directed and not scene.geo:
+        lab = scene.labels
+        src, dst = lower_label(lab["source"]), lower_label(lab["target"])
+        bits.append(f"arrows point from {src} to {dst}")
+    text = "; ".join(bits)
+    return text[:1].upper() + text[1:] + "." if text else ""
 
 
-def figure(
-    scene: Scene, *, title: str | None, height: int, what: str, caption: bool = True
-) -> go.Figure:
-    """Assemble the figure (with animation frames when there are several periods)."""
+def figure(scene: Scene, *, title: str | None, height: int, what: str) -> go.Figure:
+    """Assemble the figure, with animation frames when there are several periods."""
     keys = list(scene.frames.graphs)
-    group_keys: list[tuple[str, int, bool]] = []
-    for key in keys:
-        _, groups, _, _ = _edge_groups(scene, scene.frames.graphs[key], key)
-        for gk in groups:
-            if gk not in group_keys:
-                group_keys.append(gk)
-    group_keys.sort(key=lambda t: (t[2], t[0], t[1]))
-    per_frame = [frame_traces(scene, k, group_keys) for k in keys]
+    all_edges = _all_edges(scene.frames, scene.nodes, scene.edge_subset)
+    per_key = {k: _frame_edges(scene, k, all_edges[k]) for k in keys}
+    group_keys = sorted(
+        {gk for fe in per_key.values() for gk in fe.groups}, key=lambda t: (t[2], t[0], t[1])
+    )
+    per_frame = [frame_traces(scene, k, per_key[k], group_keys) for k in keys]
     fig = go.Figure(data=per_frame[0])
     first = scene.frames.first
     if title is None:
         if scene.frames.animated:
-            head = default_title(_without_time(first), what)
-            title = f"{head}, {keys[0]} to {keys[-1]}"
+            title = f"{default_title(_without_time(first), what)}, {keys[0]} to {keys[-1]}"
         else:
             title = default_title(first, what)
     layout = base_layout(title, height)
     layout.update(
         hovermode="closest",
         legend={
-            "title": {"text": scene.color.label if scene.cats else ""},
+            "title": {"text": scene.color.label if scene.color and scene.cats else ""},
             "itemsizing": "constant",
         },
     )
+    caption = _caption(scene)
     if caption:
-        bits = []
-        if scene.size is not None:
-            bits.append(f"node size: {scene.size.label}")
-        if isinstance(scene.width_spec, str) and scene.width_scaler is not None:
-            wl = (
-                scene.labels["weight"]
-                if scene.width_spec == "weight"
-                else scene.width_spec.replace("_", " ")
-            )
-            bits.append(f"edge width: {wl.lower()}")
-        if scene.directed and not scene.geo:
-            bits.append("arrows point from source to target")
-        if bits:
-            text = "; ".join(bits)
-            layout["annotations"] = [
-                {
-                    "text": text[:1].upper() + text[1:] + ".",
-                    "xref": "paper",
-                    "yref": "paper",
-                    "x": 0,
-                    "y": -0.01,
-                    "xanchor": "left",
-                    "yanchor": "top",
-                    "showarrow": False,
-                    "font": {"size": 11, "color": "#6b6a66"},
-                }
-            ]
-            layout["margin"] = {"l": 10, "r": 10, "t": 60, "b": 30}
+        layout["annotations"] = [
+            {
+                "text": caption,
+                "xref": "paper",
+                "yref": "paper",
+                "x": 0,
+                "y": -0.01,
+                "xanchor": "left",
+                "yanchor": "top",
+                "showarrow": False,
+                "font": {"size": 11, "color": _CAPTION_COLOR},
+            }
+        ]
+        layout["margin"] = {"l": 10, "r": 10, "t": 60, "b": 30}
     if not scene.geo:
         layout.update(xaxis={"visible": False}, yaxis={"visible": False, "scaleanchor": "x"})
     fig.update_layout(**layout)
@@ -747,15 +739,25 @@ def add_animation(
     *,
     redraw: bool,
 ) -> None:
-    """Attach frames, a play/pause button and a time slider to ``fig``."""
+    """Attach frames, a play/pause button and a time slider to ``fig``.
+
+    ``redraw`` must be True for geo traces, which Plotly cannot animate
+    without a full redraw.
+    """
     fig.frames = [
         go.Frame(data=list(tr), name=str(k)) for k, tr in zip(keys, per_frame, strict=True)
     ]
-    anim = {
+    play = {
         "frame": {"duration": 900, "redraw": redraw},
         "transition": {"duration": 300},
         "fromcurrent": True,
         "mode": "immediate",
+    }
+    pause = {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}
+    step = {
+        "frame": {"duration": 0, "redraw": redraw},
+        "mode": "immediate",
+        "transition": {"duration": 0},
     }
     fig.update_layout(
         updatemenus=[
@@ -769,15 +771,8 @@ def add_animation(
                 "pad": {"t": 40, "r": 10},
                 "showactive": False,
                 "buttons": [
-                    {"label": "Play", "method": "animate", "args": [None, anim]},
-                    {
-                        "label": "Pause",
-                        "method": "animate",
-                        "args": [
-                            [None],
-                            {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"},
-                        ],
-                    },
+                    {"label": "Play", "method": "animate", "args": [None, play]},
+                    {"label": "Pause", "method": "animate", "args": [[None], pause]},
                 ],
             }
         ],
@@ -791,23 +786,11 @@ def add_animation(
                 "pad": {"t": 30},
                 "currentvalue": {"prefix": f"{time_label}: ", "font": {"size": 13}},
                 "steps": [
-                    {
-                        "label": str(k),
-                        "method": "animate",
-                        "args": [
-                            [str(k)],
-                            {
-                                "frame": {"duration": 0, "redraw": redraw},
-                                "mode": "immediate",
-                                "transition": {"duration": 0},
-                            },
-                        ],
-                    }
-                    for k in keys
+                    {"label": str(k), "method": "animate", "args": [[str(k)], step]} for k in keys
                 ],
             }
         ],
     )
-    margin = dict(fig.layout.margin.to_plotly_json()) if fig.layout.margin else {}
-    margin["b"] = max(int(margin.get("b", 10) or 10), 90)
+    margin = fig.layout.margin.to_plotly_json() if fig.layout.margin else {}
+    margin["b"] = max(int(margin.get("b") or 10), 90)
     fig.update_layout(margin=margin)

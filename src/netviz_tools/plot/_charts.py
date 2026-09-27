@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from netviz_tools.plot._bars import Role, _long_table
-from netviz_tools.plot._data import Selector, as_list, is_flow_table
-from netviz_tools.plot._style import PALETTE, fmt, fmt_pct, lower_label, merge_labels
+from netviz_tools.analysis import suggest
+from netviz_tools.plot._bars import Role
+from netviz_tools.plot._data import Selector, as_list, check_known, is_flow_table, long_table
+from netviz_tools.plot._style import PALETTE, base_layout, fmt, fmt_pct, lower_label, merge_labels
 from netviz_tools.stats import Distribution, PowerLawFit
 
 __all__ = ["degree_distribution", "time_series"]
@@ -28,68 +29,68 @@ def _series_from_flows(
     labels: Mapping[str, str] | None,
 ) -> tuple[pd.DataFrame, dict[str, str], str, str]:
     """Aggregate flows into a period-indexed table, one column per line."""
-    df, lab = _long_table(data, labels)
+    df, lab = long_table(data, labels)
+    if "time" not in df.columns:
+        raise ValueError("time_series needs flows with a 'time' column")
+    has_cats = "category" in df.columns
     cats = as_list(category)
     if cats is not None:
-        known = set(df["category"].unique())
-        missing = [c for c in cats if c not in known]
-        if missing:
-            raise ValueError(f"category={missing!r} not found")
+        if not has_cats:
+            raise ValueError("category= given but the flows have no 'category' column")
+        check_known(cats, sorted(df["category"].unique(), key=str), "category")
         df = df[df["category"].isin(cats)]
     times = as_list(time)
     if times is not None:
+        check_known(times, sorted(df["time"].unique()), "time")
         df = df[df["time"].isin(times)]
-    if df.empty:
-        raise ValueError("no flows left to plot after filtering")
-    units = df["unit"].unique() if "unit" in df.columns else np.array([""])
+    units = sorted(df["unit"].unique().tolist()) if "unit" in df.columns else [""]
     if len(units) > 1:
         raise ValueError(
             f"the selection uses {len(units)} units ({', '.join(map(str, units))}); "
             "pass category= to plot series measured in the same unit"
         )
-    unit = str(units[0]) if len(units) else ""
-    categories_ = sorted(df["category"].unique().tolist(), key=str) if "category" in df else [None]
-    periods = sorted(df["time"].unique().tolist())
-    many_cats = len(categories_) > 1
+    if df.empty:
+        raise ValueError("no flows left to plot after filtering")
+    unit = str(units[0])
+    groups: list[tuple[str | None, pd.DataFrame]] = (
+        [(str(c), part) for c, part in df.groupby("category", sort=True)]
+        if has_cats
+        else [(None, df)]
+    )
+    many_cats = len(groups) > 1
     columns: dict[str, pd.Series] = {}
     if not focus:
-        for c in categories_:
-            part = df if c is None else df[df["category"] == c]
-            columns[str(c) if many_cats or c is not None else lab["weight"]] = part.groupby("time")[
-                "weight"
-            ].sum()
+        for c, part in groups:
+            columns[c if c is not None else lab["weight"]] = part.groupby("time")["weight"].sum()
         what = f"total {lower_label(lab['weight'])}"
     else:
-        known_nodes = set(df["source"]) | set(df["target"])
+        known_nodes = {str(n) for n in pd.concat([df["source"], df["target"]]).unique()}
         for n in focus:
-            if n not in known_nodes:
-                from netviz_tools.analysis import suggest
-
-                hint = suggest(str(n), [str(x) for x in known_nodes])
+            if str(n) not in known_nodes:
+                hint = suggest(str(n), sorted(known_nodes))
                 extra = f". Did you mean: {', '.join(map(repr, hint))}?" if hint else ""
                 raise ValueError(f"focus node {n!r} has no flows in the selection{extra}")
-        sides = ["out", "in"] if role == "both" else [role]
+        sides: list[Literal["out", "in"]] = ["out", "in"] if role == "both" else [role]
         for n in focus:
-            for c in categories_:
-                part = df if c is None else df[df["category"] == c]
+            for c, part in groups:
                 for side in sides:
                     col = "source" if side == "out" else "target"
-                    s = part[part[col] == n].groupby("time")["weight"].sum()
                     bits = [str(n)] if len(focus) > 1 else []
-                    if many_cats:
-                        bits.append(str(c))
+                    if many_cats and c is not None:
+                        bits.append(c)
                     name = ", ".join(bits)
-                    name = (
-                        f"{name}: {lab[side]}" if name and len(sides) > 1 else (name or lab[side])
-                    )
-                    columns[name] = s
+                    if len(sides) > 1 or not name:
+                        name = f"{name}: {lab[side]}" if name else lab[side]
+                    columns[name] = part[part[col] == n].groupby("time")["weight"].sum()
         what = " and ".join(lower_label(lab[s]) for s in sides)
         what = f"{', '.join(map(str, focus))}: {what}"
+    periods = sorted(df["time"].unique().tolist())
     table = pd.DataFrame(columns).reindex(periods).fillna(0.0)
     table.index.name = "time"
     head = what[:1].upper() + what[1:]
-    if not many_cats and categories_[0] is not None:
-        head = f"{categories_[0]}, {what}" if not focus else f"{head} ({categories_[0]})"
+    only = groups[0][0]
+    if not many_cats and only is not None:
+        head = f"{only}, {what}" if not focus else f"{head} ({only})"
     return table, lab, unit, head
 
 
@@ -165,7 +166,7 @@ def time_series(
         If more than eight series would share one panel. Select fewer, or use
         ``facet=True``.
     """
-    focus_list = [] if focus is None else list(as_list(focus) or [])
+    focus_list = as_list(focus) or []
     unit = ""
     auto_title = ""
     lab = merge_labels(labels)
@@ -183,78 +184,65 @@ def time_series(
         cols = list(columns) if columns is not None else [str(c) for c in df.columns]
         missing = [c for c in cols if c not in df.columns]
         if missing:
-            raise ValueError(f"columns not in df: {missing}")
+            raise ValueError(f"columns not in the table: {missing}")
     values = df[cols].astype(float)
     pct = values.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     shown = pct * 100 if change else values
     x = [str(i) if isinstance(i, tuple) else i for i in df.index]
-    if y_title is None and unit:
-        y_title = f"{lab['weight']} ({unit})"
     if change:
         y_title = "Change from previous period (%)"
         auto_title = f"{auto_title}, change from previous period" if auto_title else ""
+    elif y_title is None and unit:
+        y_title = f"{lab['weight']} ({unit})"
 
     def hover(col: str) -> list[str]:
         out = []
-        for i, idx in enumerate(df.index):
-            v = values[col].iloc[i]
-            p = pct[col].iloc[i]
+        for i, (idx, v, p) in enumerate(zip(df.index, values[col], pct[col], strict=True)):
             text = f"<b>{col}</b><br>{idx}: {fmt(v, unit)}"
             if i > 0:
-                text += f"<br>change: {fmt_pct(p) if np.isfinite(p) else 'n/a'}"
+                text += f"<br>change: {fmt_pct(p)}"
             out.append(text)
         return out
 
+    def line(col: str, color: str, *, legend: bool) -> go.Scatter:
+        return go.Scatter(
+            x=x,
+            y=shown[col].tolist(),
+            mode="lines+markers",
+            name=col,
+            showlegend=legend,
+            line={"width": 2, "color": color},
+            marker={"size": 7},
+            hovertext=hover(col),
+            hoverinfo="text",
+        )
+
+    layout = base_layout(
+        title if title is not None else auto_title,
+        height or (220 * len(cols) if facet else 450),
+        margin={"l": 60, "r": 20, "t": 70, "b": 40},
+    )
     if facet:
         fig = make_subplots(
             rows=len(cols), cols=1, shared_xaxes=True, subplot_titles=cols, vertical_spacing=0.08
         )
         for i, col in enumerate(cols, start=1):
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=shown[col].tolist(),
-                    mode="lines+markers",
-                    name=col,
-                    showlegend=False,
-                    line={"width": 2, "color": PALETTE[0]},
-                    marker={"size": 7},
-                    hovertext=hover(col),
-                    hoverinfo="text",
-                ),
-                row=i,
-                col=1,
-            )
-        fig.update_layout(height=height or 220 * len(cols))
+            fig.add_trace(line(col, PALETTE[0], legend=False), row=i, col=1)
     else:
         if len(cols) > len(PALETTE):
             raise ValueError(
                 f"{len(cols)} series in one panel is too many to tell apart; "
                 f"select at most {len(PALETTE)} or pass facet=True"
             )
-        fig = go.Figure()
-        for col, color in zip(cols, PALETTE, strict=False):
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=shown[col].tolist(),
-                    mode="lines+markers",
-                    name=str(col),
-                    line={"width": 2, "color": color},
-                    marker={"size": 7},
-                    hovertext=hover(col),
-                    hoverinfo="text",
-                )
-            )
-        fig.update_layout(height=height or 450, yaxis_title=y_title, hovermode="closest")
+        fig = go.Figure(
+            [line(c, color, legend=True) for c, color in zip(cols, PALETTE, strict=False)]
+        )
+        layout["yaxis"] = {"title": {"text": y_title}}
         if change:
             fig.add_hline(y=0, line={"color": "#bdbcb6", "width": 1})
-    fig.update_layout(
-        title={"text": title if title is not None else auto_title},
-        template="plotly_white",
-        xaxis_title=lab["time"] if auto_title else None,
-        margin={"l": 60, "r": 20, "t": 70, "b": 40},
-    )
+    fig.update_layout(**layout)
+    if auto_title:
+        fig.update_xaxes(title={"text": lab["time"]}, row=len(cols) if facet else None)
     return fig
 
 
@@ -320,20 +308,16 @@ def degree_distribution(
             )
         )
     ln, ex = fit.vs_lognormal, fit.vs_exponential
+    x_title = (labels or {}).get(fit.quantity, fit.quantity.replace("_", " "))
     default = (
-        f"{fit.quantity.replace('_', ' ')} distribution: power law vs lognormal "
-        f"R={ln.loglikelihood_ratio:.1f} (p={ln.p_value:.2f}), vs exponential "
-        f"R={ex.loglikelihood_ratio:.1f} (p={ex.p_value:.2f})"
+        f"{x_title[:1].upper()}{x_title[1:]} distribution<br><sup>power law vs lognormal: "
+        f"R={ln.loglikelihood_ratio:.1f} (p={ln.p_value:.2f}); vs exponential: "
+        f"R={ex.loglikelihood_ratio:.1f} (p={ex.p_value:.2f})</sup>"
     )
-    fig.update_layout(
-        title={"text": title or default, "font": {"size": 14}},
-        template="plotly_white",
-        height=height,
-        xaxis={
-            "type": "log",
-            "title": (labels or {}).get(fit.quantity, fit.quantity.replace("_", " ")),
-        },
-        yaxis={"type": "log", "title": "P(X ≥ x)"},
-        margin={"l": 60, "r": 20, "t": 70, "b": 50},
+    layout = base_layout(title or default, height, margin={"l": 60, "r": 20, "t": 80, "b": 50})
+    layout.update(
+        xaxis={"type": "log", "title": {"text": x_title}},
+        yaxis={"type": "log", "title": {"text": "P(X ≥ x)"}},
     )
+    fig.update_layout(**layout)
     return fig

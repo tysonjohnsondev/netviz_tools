@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Hashable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Real
-from typing import Any, Final, Literal, TypeAlias, get_args
+from typing import Any, Final, Literal, TypeAlias, cast, get_args
 
 import networkx as nx
 import numpy as np
@@ -13,7 +14,7 @@ import pandas as pd
 
 from netviz_tools._nxutil import has_weights
 from netviz_tools.errors import UnknownMetricError
-from netviz_tools.metrics import centrality, communities
+from netviz_tools.metrics import CentralityKind, centrality, communities
 from netviz_tools.plot._style import (
     CONTINENT_COLORS,
     MISSING_COLOR,
@@ -42,11 +43,11 @@ edges. ``community`` uses the ``partition=`` you pass, or Louvain communities
 with a fixed seed.
 """
 
-NodeSpec: TypeAlias = str | Mapping[Hashable, Any] | pd.Series | None
+NodeSpec: TypeAlias = str | Mapping[Any, Any] | pd.Series | None
 """A node attribute name, a :data:`NodeMetric` name, ``"auto"``, a mapping or
 Series from node to value, or ``None``."""
 
-EdgeSpec: TypeAlias = str | Mapping[tuple[Hashable, Hashable], Any] | None
+EdgeSpec: TypeAlias = str | Mapping[tuple[Any, Any], Any] | None
 """An edge attribute name (such as ``"weight"``), ``"auto"``, ``"source"`` or
 ``"target"`` (edges take the colour of that end node; ``edge_color_by`` only),
 a mapping from ``(u, v)`` to value, or ``None``."""
@@ -57,13 +58,19 @@ _WEIGHT_METRICS: Final = {"strength", "in_strength", "out_strength"}
 
 @dataclass(frozen=True, eq=False)
 class NodeValues:
-    """Resolved node values."""
+    """Resolved node values.
 
-    values: pd.Series
+    ``metric`` is True when the values were computed from the graph (so they
+    change from one period to the next); ``in_weight_units`` when they are
+    measured in the unit of the edge weights (strengths).
+    """
+
+    series: pd.Series
     name: str
     label: str
     categorical: bool
-    in_weight_units: bool
+    metric: bool = False
+    in_weight_units: bool = False
 
 
 @dataclass(frozen=True, eq=False)
@@ -94,7 +101,8 @@ def metric_label(name: str, labels: Mapping[str, str], *, directed: bool) -> str
     return derived.get(name, name.replace("_", " ").capitalize())
 
 
-def _is_numeric(values: pd.Series) -> bool:
+def is_numeric(values: pd.Series) -> bool:
+    """Return True when every present value is a real number (booleans are not)."""
     present = values.dropna()
     if present.empty:
         return False
@@ -124,7 +132,7 @@ def compute_metric(
         else:
             part = pd.Series(0, index=nodes)
         return part
-    df = centrality(g, [name])  # type: ignore[list-item]
+    df = centrality(g, [cast(CentralityKind, name)])
     return df[name].reindex(nodes)
 
 
@@ -155,16 +163,21 @@ def node_values(
             spec = chosen
         if any(spec in d for _, d in g.nodes(data=True)):
             values = pd.Series([g.nodes[n].get(spec) for n in nodes], index=nodes, dtype=object)
-            numeric = _is_numeric(values)
+            numeric = is_numeric(values)
             if numeric:
                 values = values.astype(float)
             label = metric_label(spec, labels, directed=directed)
-            return NodeValues(values, spec, label, not numeric, False)
+            return NodeValues(values, spec, label, categorical=not numeric)
         if spec in METRICS:
             values = compute_metric(g, spec, partition=partition, seed=seed)
-            label = metric_label(spec, labels, directed=directed)
-            categorical = spec == "community"
-            return NodeValues(values, spec, label, categorical, spec in _WEIGHT_METRICS)
+            return NodeValues(
+                values,
+                spec,
+                metric_label(spec, labels, directed=directed),
+                categorical=spec == "community",
+                metric=True,
+                in_weight_units=spec in _WEIGHT_METRICS,
+            )
         attrs = sorted({k for _, d in g.nodes(data=True) for k in d})
         raise UnknownMetricError(
             f"{arg}={spec!r} is neither a node attribute nor a metric. "
@@ -172,11 +185,13 @@ def node_values(
         )
     series = spec if isinstance(spec, pd.Series) else pd.Series(dict(spec), dtype=object)
     values = series.reindex(nodes)
-    numeric = _is_numeric(values)
+    numeric = is_numeric(values)
     if numeric:
         values = values.astype(float)
-    name = str(series.name) if isinstance(series, pd.Series) and series.name else arg
-    return NodeValues(values, name, labels.get(name, name.replace("_", " ")), not numeric, False)
+    name = arg if series.name is None or series.name == "" else str(series.name)
+    return NodeValues(
+        values, name, labels.get(name, name.replace("_", " ")), categorical=not numeric
+    )
 
 
 def categories(values: pd.Series, *, name: str = "") -> Categories:
@@ -188,32 +203,29 @@ def categories(values: pd.Series, *, name: str = "") -> Categories:
     first eight categories get :data:`PALETTE` colours, the rest are shown as
     ``"Other"``; missing values as ``"No value"``.
     """
-    present = values.dropna()
     if name == "community":
-        raw = values.map(lambda v: f"Community {int(v)}" if pd.notna(v) else None)
-        ordered = [f"Community {int(v)}" for v in sorted(present.unique())]
+        texts = [None if pd.isna(v) else f"Community {int(v)}" for v in values]
+        ordered = [f"Community {int(v)}" for v in sorted(values.dropna().unique())]
     else:
-        raw = values.map(lambda v: str(v) if pd.notna(v) and v != "" else None)
-        uniq = set(raw.dropna())
+        texts = [None if pd.isna(v) or v == "" else str(v) for v in values]
+        uniq = {t for t in texts if t is not None}
         if uniq and uniq <= set(CONTINENT_COLORS):
-            colors = {c: CONTINENT_COLORS[c] for c in CONTINENT_COLORS if c in uniq}
-            return _finish(raw, colors)
-        if uniq and uniq <= {"True", "False"}:
+            ordered = [c for c in CONTINENT_COLORS if c in uniq]
+        elif uniq and uniq <= {"True", "False"}:
             ordered = [c for c in ("False", "True") if c in uniq]
         else:
-            counts = raw.dropna().value_counts()
-            ordered = sorted(counts.index, key=lambda c: (-int(counts[c]), c))
-    colors = dict(zip(ordered[: len(PALETTE)], PALETTE, strict=False))
-    return _finish(raw, colors)
-
-
-def _finish(raw: pd.Series, colors: dict[str, str]) -> Categories:
-    labels = raw.map(lambda c: MISSING_LABEL if c is None else (c if c in colors else OTHER_LABEL))
-    if (labels == OTHER_LABEL).any():
+            counts = Counter(t for t in texts if t is not None)
+            ordered = sorted(counts, key=lambda c: (-counts[c], c))
+    if ordered and set(ordered) <= set(CONTINENT_COLORS):
+        colors = {c: CONTINENT_COLORS[c] for c in ordered}
+    else:
+        colors = dict(zip(ordered[: len(PALETTE)], PALETTE, strict=False))
+    labels = [MISSING_LABEL if c is None else (c if c in colors else OTHER_LABEL) for c in texts]
+    if OTHER_LABEL in labels:
         colors[OTHER_LABEL] = OTHER_COLOR
-    if (labels == MISSING_LABEL).any():
+    if MISSING_LABEL in labels:
         colors[MISSING_LABEL] = MISSING_COLOR
-    return Categories(labels, colors)
+    return Categories(pd.Series(labels, index=values.index, dtype=object), colors)
 
 
 def edge_values(
@@ -243,7 +255,7 @@ def edge_values(
             return None if directed else lookup.get((v, u))
 
         series = pd.Series([get(u, v) for u, v, _ in edges], dtype=object)
-    if _is_numeric(series):
+    if is_numeric(series):
         return series.astype(float)
     return series
 

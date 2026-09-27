@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 
 from netviz_tools.plot._bars import compare, ranking
 from netviz_tools.plot._charts import degree_distribution, time_series
-from netviz_tools.plot._data import as_list, is_flow_table, to_frames
+from netviz_tools.plot._data import Selector, as_list, is_flow_table, to_frames
 from netviz_tools.plot._geo import flow_map, has_coordinates
 from netviz_tools.plot._matrix import adjacency
 from netviz_tools.plot._network import ego, network
@@ -51,15 +51,15 @@ KINDS: Final[Mapping[str, Callable[..., go.Figure]]] = {
 """Every chart function reachable through :func:`auto`, by name."""
 
 
-def _single_focus(focus: object) -> Hashable | None:
-    items = as_list(focus)  # type: ignore[arg-type]
+def _single_focus(focus: Selector) -> Hashable | None:
+    items = as_list(focus)
     return items[0] if items is not None and len(items) == 1 else None
 
 
-def _n_categories(data: pd.DataFrame, category: object) -> int:
+def _n_categories(data: pd.DataFrame, category: Selector) -> int:
     if "category" not in data.columns:
         return 1
-    cats = as_list(category)  # type: ignore[arg-type]
+    cats = as_list(category)
     col = data["category"]
     return int(col[col.isin(cats)].nunique()) if cats is not None else int(col.nunique())
 
@@ -112,9 +112,13 @@ def choose_kind(data: object, **kwargs: Any) -> tuple[str, str]:
     if isinstance(data, pd.DataFrame) and not is_flow_table(data):
         return "time_series", "the data is a table of values by period"
     focus = _single_focus(kwargs.get("focus"))
-    if focus is not None:
-        if is_flow_table(data) and _n_categories(data, kwargs.get("category")) > 1:  # type: ignore[arg-type]
-            return "compare", f"one focus node ({focus}) and several categories"
+    if (
+        focus is not None
+        and isinstance(data, pd.DataFrame)
+        and is_flow_table(data)
+        and _n_categories(data, kwargs.get("category")) > 1
+    ):
+        return "compare", f"one focus node ({focus}) and several categories"
     frames = to_frames(
         data,
         time=kwargs.get("time"),
@@ -126,9 +130,8 @@ def choose_kind(data: object, **kwargs: Any) -> tuple[str, str]:
         if frames.animated:
             return "time_series", f"one focus node ({focus}) and several periods"
         return "ego", f"one focus node ({focus})"
-    u = frames.union()
-    coords = kwargs.get("coords")
-    if coords is not None or has_coordinates(u):
+    u = frames.union
+    if has_coordinates(u, kwargs.get("coords")):
         what = "every node has coordinates"
         return "flow_map", what + (", animated over time" if frames.animated else "")
     if not frames.animated and _only_sends_or_receives(u):
@@ -186,7 +189,7 @@ def auto(data: Any, kind: Kind | Literal["map"] = "auto", **kwargs: Any) -> go.F
     if kind == "auto":
         chosen, reason = choose_kind(data, **kwargs)
     elif kind in KINDS:
-        chosen = kind
+        chosen = "flow_map" if kind == "map" else kind
     else:
         raise ValueError(f"unknown kind {kind!r}; choose from {['auto', *KINDS]}")
     fn = KINDS[chosen]

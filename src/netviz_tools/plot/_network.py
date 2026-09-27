@@ -14,13 +14,8 @@ import plotly.graph_objects as go
 
 from netviz_tools._nxutil import has_weights
 from netviz_tools.plot._data import Frames, PlotData, Selector, to_frames
-from netviz_tools.plot._geo import coordinates, geo_layout
-from netviz_tools.plot._render import (
-    ShowLabels,
-    figure,
-    prepare,
-    resolve_focus,
-)
+from netviz_tools.plot._geo import coordinates, geo_layout, positions
+from netviz_tools.plot._render import ShowLabels, figure, prepare, resolve_focus
 from netviz_tools.plot._resolve import (
     EdgeSpec,
     NodeSpec,
@@ -114,8 +109,6 @@ def _bipartite_top(g: nx.Graph[Any]) -> list[Hashable]:
 
 
 def _normalize(raw: Mapping[Hashable, Any]) -> dict[Hashable, tuple[float, float]]:
-    if not raw:
-        return {}
     arr = np.asarray([tuple(p) for p in raw.values()], dtype=float)
     arr = arr - arr.mean(axis=0)
     extent = float(np.abs(arr).max())
@@ -139,6 +132,7 @@ def compute_layout(
     n = g.number_of_nodes()
     if n == 0:
         return {}
+    raw: Mapping[Hashable, Any]
     if layout == "spring":
         raw = nx.spring_layout(g, seed=seed, weight=None, **opts)
     elif layout == "kamada_kawai":
@@ -213,12 +207,12 @@ def _draw_network(
     edge_width_by: EdgeSpec,
     edge_color_by: EdgeSpec,
     label_by: str | None,
-    show_labels: Any,
+    show_labels: ShowLabels,
     top_n: int | None,
     focus: Hashable | Iterable[Hashable] | None,
     title: str | None,
     height: int,
-    pos: Mapping[Hashable, tuple[float, float]] | None,
+    pos: Mapping[Any, tuple[float, float]] | None,
     partition: pd.Series | None,
     seed: int,
     min_weight_quantile: float | None,
@@ -226,14 +220,14 @@ def _draw_network(
     layout_options: Mapping[str, Any] | None,
     what: str,
 ) -> go.Figure:
-    u = frames.union()
+    u = frames.union
     focus_nodes = resolve_focus(u, focus)
     if edge_width_by == "auto":
         edge_width_by = "weight" if has_weights(u) else None
     labels = frames.labels
     size = node_values(u, size_by, arg="size_by", labels=labels, partition=partition, seed=seed)
     color = node_values(u, color_by, arg="color_by", labels=labels, partition=partition, seed=seed)
-    nodes = _choose_nodes(u, size.values if size else None, top_n, max_nodes, focus_nodes)
+    nodes = _choose_nodes(u, size.series if size else None, top_n, max_nodes, focus_nodes)
     sub = u.subgraph(nodes)
     geo = layout == "geo"
     if pos is not None:
@@ -243,23 +237,22 @@ def _draw_network(
         placed = {n: (float(pos[n][0]), float(pos[n][1])) for n in nodes}
     elif geo:
         table = coordinates(sub, None)
-        have = [n for n in nodes if n in table.index]
-        if len(have) < len(nodes):
-            dropped = [str(n) for n in nodes if n not in table.index]
+        dropped = [str(n) for n in nodes if n not in table.index]
+        if dropped:
             warnings.warn(
                 f"no coordinates for {len(dropped)} node(s), they are left out: {dropped[:10]}",
                 UserWarning,
                 stacklevel=3,
             )
-            nodes = have
-        placed = {n: (float(table.at[n, "lon"]), float(table.at[n, "lat"])) for n in nodes}
+            nodes = [n for n in nodes if n in table.index]
+        placed = positions(table, nodes)
     else:
         groups = None
         if color is not None and color.categorical:
-            groups = color.values.reindex(nodes).astype(str)
+            groups = color.series.reindex(nodes).astype(str)
         part = partition
         if part is None and color is not None and color.name == "community":
-            part = color.values
+            part = color.series
         placed = compute_layout(
             sub,
             layout,
@@ -274,19 +267,15 @@ def _draw_network(
         nodes=nodes,
         pos=placed,
         geo=geo,
-        size_by=size_by,
-        color_by=color_by,
+        size=size,
+        color=color,
         edge_width_by=edge_width_by,
         edge_color_by=edge_color_by,
         label_by=label_by,
         show_labels=show_labels,
         focus=focus_nodes,
-        partition=partition,
-        seed=seed,
         size_range=(6.0, 26.0) if geo else (8.0, 40.0),
         min_weight_quantile=min_weight_quantile,
-        union=u,
-        resolved=(size, color),
     )
     fig = figure(scene, title=title, height=height, what=what)
     if geo:
@@ -311,7 +300,7 @@ def network(
     labels: Mapping[str, str] | None = None,
     title: str | None = None,
     height: int = 650,
-    pos: Mapping[Hashable, tuple[float, float]] | None = None,
+    pos: Mapping[Any, tuple[float, float]] | None = None,
     partition: pd.Series | None = None,
     seed: int = 42,
     min_weight_quantile: float | None = None,
@@ -495,7 +484,7 @@ def ego(
         The figure. It is not shown.
     """
     frames = to_frames(data, time=time, category=category, labels=labels, node_attrs=node_attrs)
-    u = frames.union()
+    u = frames.union
     centres = resolve_focus(u, focus)
     keep: set[Hashable] = set()
     for c in centres:
@@ -505,8 +494,6 @@ def ego(
         frames.labels,
         frames.unit,
     )
-    for g in restricted.graphs.values():
-        g.graph.update(frames.first.graph)
     if title is None:
         names = ", ".join(map(str, centres))
         steps = "1 step" if radius == 1 else f"{radius} steps"

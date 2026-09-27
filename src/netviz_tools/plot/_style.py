@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
+from itertools import pairwise
 from typing import Any, Final
 
 import networkx as nx
@@ -44,6 +45,10 @@ EDGE_COLOR: Final = "rgba(110, 110, 110, 0.35)"
 EDGE_FOCUS_COLOR: Final = "rgba(40, 40, 40, 0.7)"
 TEXT_COLOR: Final = "#3d3d3a"
 SURFACE: Final = "#ffffff"
+ARROW: Final = "\u2192"
+"""Separator between the ends of a directed edge in hover text."""
+EN_DASH: Final = "\u2013"
+"""Separator between the ends of an undirected edge in hover text."""
 
 CONTINENT_COLORS: Final[Mapping[str, str]] = {
     "Asia": PALETTE[0],
@@ -113,23 +118,34 @@ def wants_log(values: Iterable[float]) -> bool:
 class Scaler:
     """Scale values onto a range using bounds fixed in advance.
 
-    Values are log-scaled when they span more than two orders of magnitude.
-    Fixing the bounds lets every frame of an animation share one scale.
-    Missing values map to ``lo``.
+    Values are log-scaled (``log10(1 + x)``) when they span more than two
+    orders of magnitude. Fixing the bounds lets every frame of an animation
+    share one scale. Missing values map to ``lo``.
     """
 
     def __init__(self, values: Iterable[float], lo: float, hi: float) -> None:
         arr = np.asarray([v for v in values if np.isfinite(v)], dtype=float)
         self.log = wants_log(arr)
-        t = self._t(arr)
+        t = self.transform(arr)
         self.vmin = float(t.min()) if t.size else 0.0
         self.vmax = float(t.max()) if t.size else 0.0
         self.lo, self.hi = lo, hi
 
-    def _t(self, arr: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    def transform(self, values: Iterable[float]) -> npt.NDArray[np.float64]:
+        """Return values on the internal (possibly logarithmic) scale."""
+        arr = np.asarray(list(values), dtype=float)
         if self.log:
             return np.asarray(np.log10(1.0 + np.clip(arr, 0.0, None)), dtype=float)
         return arr
+
+    def inverse(self, t: float) -> float:
+        """Map a value on the internal scale back to data units."""
+        return float(10.0**t - 1.0) if self.log else float(t)
+
+    def ticks(self) -> tuple[list[float], list[str]]:
+        """Return round tick values as positions on the internal scale, and their labels."""
+        values = nice_ticks(self.inverse(self.vmin), self.inverse(self.vmax), log=self.log)
+        return self.transform(values).tolist(), [fmt(v) for v in values]
 
     def unit(self, values: Iterable[float]) -> npt.NDArray[np.float64]:
         """Return positions in ``[0, 1]`` (NaN stays NaN)."""
@@ -137,11 +153,41 @@ class Scaler:
         span = self.vmax - self.vmin
         if span == 0.0:
             return np.where(np.isfinite(arr), 1.0, np.nan)
-        return np.asarray(np.clip((self._t(arr) - self.vmin) / span, 0.0, 1.0), dtype=float)
+        return np.asarray(np.clip((self.transform(arr) - self.vmin) / span, 0.0, 1.0), dtype=float)
 
     def __call__(self, values: Iterable[float]) -> npt.NDArray[np.float64]:
         t = self.unit(values)
         return np.asarray(self.lo + np.nan_to_num(t, nan=0.0) * (self.hi - self.lo), dtype=float)
+
+
+def nice_ticks(lo: float, hi: float, *, log: bool = False) -> list[float]:
+    """Return round tick values between ``lo`` and ``hi`` (inclusive).
+
+    On a log scale (used when ``hi`` is at least 10) the ticks are 1, 2 and
+    5 times powers of ten, or only powers of ten when that gives more than
+    six ticks; otherwise about five evenly spaced round numbers.
+
+    >>> nice_ticks(0, 1000, log=True)
+    [0.0, 1.0, 10.0, 100.0, 1000.0]
+    >>> nice_ticks(0, 0.9)
+    [0.0, 0.2, 0.4, 0.6, 0.8]
+    """
+    if not (math.isfinite(lo) and math.isfinite(hi)) or hi <= lo:
+        return [float(lo)]
+    if log and hi >= 10.0:
+        first = math.floor(math.log10(lo)) if lo > 0 else 0
+        powers = [10.0**k for k in range(first, math.ceil(math.log10(hi)) + 1)]
+        values = [m * p for p in powers for m in (1.0, 2.0, 5.0) if lo <= m * p <= hi]
+        if len(values) > 6:
+            values = [p for p in powers if lo <= p <= hi]
+        if len(values) > 1:
+            return [0.0, *values] if lo <= 0.0 else values
+    raw = (hi - lo) / 5
+    mag = 10.0 ** math.floor(math.log10(raw))
+    step = next(m * mag for m in (1.0, 2.0, 2.5, 5.0, 10.0) if m * mag >= raw)
+    start = math.ceil(lo / step - 1e-9) * step
+    count = int((hi - start) / step + 1e-9) + 1
+    return [round(start + i * step, 12) for i in range(count)]
 
 
 def rgba(hex_color: str, alpha: float) -> str:
@@ -154,7 +200,7 @@ def rgba(hex_color: str, alpha: float) -> str:
 def sample_sequential(t: float) -> str:
     """Return the :data:`SEQUENTIAL` colour at position ``t`` in ``[0, 1]``."""
     t = min(max(float(t), 0.0), 1.0)
-    for (t0, c0), (t1, c1) in zip(SEQUENTIAL, SEQUENTIAL[1:], strict=False):
+    for (t0, c0), (t1, c1) in pairwise(SEQUENTIAL):
         if t <= t1:
             f = (t - t0) / (t1 - t0)
             a = [int(c0[i : i + 2], 16) for i in (1, 3, 5)]

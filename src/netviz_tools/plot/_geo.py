@@ -7,13 +7,14 @@ from collections.abc import Hashable, Iterable, Mapping
 from typing import Any
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
 from netviz_tools._nxutil import has_weights
 from netviz_tools.plot._data import PlotData, Selector, to_frames
 from netviz_tools.plot._render import ShowLabels, figure, prepare, resolve_focus
-from netviz_tools.plot._resolve import EdgeSpec, NodeSpec, edge_values, node_values
+from netviz_tools.plot._resolve import EdgeSpec, NodeSpec, edge_values, node_values, select_top
 
 __all__ = ["flow_map"]
 
@@ -38,12 +39,20 @@ def coordinates(g: nx.Graph[Any], coords: pd.DataFrame | None) -> pd.DataFrame:
     return countries()[["lon", "lat"]]
 
 
-def has_coordinates(g: nx.Graph[Any]) -> bool:
-    """True when every node has coordinates (attributes or FAOSTAT country names)."""
+def has_coordinates(g: nx.Graph[Any], coords: pd.DataFrame | None = None) -> bool:
+    """Return True when every node of ``g`` has coordinates (see :func:`coordinates`)."""
     if g.number_of_nodes() == 0:
         return False
-    table = coordinates(g, None)
-    return all(n in table.index for n in g.nodes)
+    index = coordinates(g, coords).index
+    return all(n in index for n in g.nodes)
+
+
+def positions(table: pd.DataFrame, nodes: list[Hashable]) -> dict[Hashable, tuple[float, float]]:
+    """Return ``{node: (lon, lat)}`` for nodes listed in a coordinate table."""
+    rows = table.reindex(nodes)
+    lon = rows["lon"].to_numpy(dtype=float)
+    lat = rows["lat"].to_numpy(dtype=float)
+    return {n: (float(x), float(y)) for n, x, y in zip(nodes, lon, lat, strict=True)}
 
 
 def geo_layout(projection: str) -> dict[str, Any]:
@@ -125,41 +134,31 @@ def flow_map(
         edges are skipped.
     """
     frames = to_frames(data, time=time, category=category, labels=labels, node_attrs=node_attrs)
-    u = frames.union()
-    focus_nodes = set(resolve_focus(u, focus))
+    u = frames.union
+    focus_nodes = resolve_focus(u, focus)
     table = coordinates(u, coords)
     if edge_width_by == "auto":
         edge_width_by = "weight" if has_weights(u) else None
     directed = u.is_directed()
 
+    # The top_n largest edges of each period (touching a focus node, if any).
     missing: set[str] = set()
-
-    def top_edges(g: nx.Graph[Any], _key: Hashable) -> list[tuple[Hashable, Hashable]]:
+    chosen: dict[Hashable, list[tuple[Hashable, Hashable]]] = {}
+    for key, g in frames.graphs.items():
         cand = [
             (a, b, d)
             for a, b, d in g.edges(data=True)
-            if not focus_nodes or a in focus_nodes or b in focus_nodes
+            if a != b and (not focus_nodes or a in focus_nodes or b in focus_nodes)
         ]
         w = edge_values(cand, edge_width_by, arg="edge_width_by", directed=directed)
-        order = (
-            pd.to_numeric(w, errors="coerce")
-            .fillna(0.0)
-            .sort_values(ascending=False, kind="stable")
+        rank = (
+            pd.to_numeric(w, errors="coerce").fillna(0.0).to_numpy()
             if w is not None
-            else pd.Series(range(len(cand)), dtype=float)
+            else np.zeros(len(cand))
         )
-        chosen = [cand[i] for i in order.index[:top_n]]
-        for a, b, _ in chosen:
-            missing.update(str(n) for n in (a, b) if n not in table.index)
-        return [(a, b) for a, b, _ in chosen if a in table.index and b in table.index]
-
-    selected: list[Hashable] = []
-    for key, g in frames.graphs.items():
-        for a, b in top_edges(g, key):
-            for n in (a, b):
-                if n not in selected:
-                    selected.append(n)
-    selected += [n for n in focus_nodes if n not in selected and n in table.index]
+        top = [cand[i] for i in np.argsort(-rank, kind="stable")[:top_n]]
+        missing.update(str(n) for a, b, _ in top for n in (a, b) if n not in table.index)
+        chosen[key] = [(a, b) for a, b, _ in top if a in table.index and b in table.index]
     if missing:
         warnings.warn(
             f"no coordinates for {len(missing)} node(s), their flows are skipped: "
@@ -167,34 +166,30 @@ def flow_map(
             UserWarning,
             stacklevel=2,
         )
-    labels_ = frames.labels
-    size = node_values(u, size_by, arg="size_by", labels=labels_, seed=seed)
-    color = node_values(u, color_by, arg="color_by", labels=labels_, seed=seed)
-    if size is not None and pd.api.types.is_numeric_dtype(size.values):
-        vals = size.values.reindex(selected).fillna(-1.0)
-        selected = sorted(selected, key=lambda n: (-float(vals[n]), str(n)))
-    pos = {n: (float(table.at[n, "lon"]), float(table.at[n, "lat"])) for n in selected}
+    ends = dict.fromkeys(n for pairs in chosen.values() for pair in pairs for n in pair)
+    selected = [*ends, *(n for n in focus_nodes if n not in ends and n in table.index)]
+    lab = frames.labels
+    size = node_values(u, size_by, arg="size_by", labels=lab, seed=seed)
+    color = node_values(u, color_by, arg="color_by", labels=lab, seed=seed)
+    if size is not None and not size.categorical:
+        selected = select_top(size.series.reindex(selected), None)
     scene = prepare(
         frames,
         nodes=selected,
-        pos=pos,
+        pos=positions(table, selected),
         geo=True,
-        size_by=size_by,
-        color_by=color_by,
+        size=size,
+        color=color,
         edge_width_by=edge_width_by,
         edge_color_by=edge_color_by,
         label_by=label_by,
         show_labels=show_labels,
-        focus=sorted(focus_nodes, key=str),
-        partition=None,
-        seed=seed,
+        focus=focus_nodes,
         size_range=(5.0, 26.0),
-        edge_filter=top_edges,
-        union=u,
-        resolved=(size, color),
+        edge_subset=chosen,
     )
     if focus_nodes:
-        what = "flows of " + ", ".join(map(str, sorted(focus_nodes, key=str)))
+        what = "flows of " + ", ".join(map(str, focus_nodes))
     else:
         what = f"flows, {top_n} largest"
     fig = figure(scene, title=title, height=height, what=what)

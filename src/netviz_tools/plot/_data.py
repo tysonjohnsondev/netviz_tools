@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, TypeAlias
 
 import networkx as nx
@@ -13,7 +14,7 @@ from netviz_tools._nxutil import as_simple
 from netviz_tools.errors import MixedSliceError
 from netviz_tools.plot._style import graph_labels, merge_labels, unit_of
 
-PlotData: TypeAlias = "nx.Graph[Any] | pd.DataFrame | Mapping[Hashable, nx.Graph[Any]]"
+PlotData: TypeAlias = "nx.Graph[Any] | pd.DataFrame | Mapping[Any, nx.Graph[Any]]"
 """What plot functions accept: a NetworkX graph, a flow table (see
 :data:`netviz_tools.FLOW_COLUMNS`), or a mapping from period to graph such as
 the output of ``graphs_by(flows, by="time")``."""
@@ -36,7 +37,8 @@ def as_list(sel: Selector) -> list[Hashable] | None:
     return list(sel)
 
 
-def _check_known(wanted: list[Hashable], available: Iterable[Hashable], arg: str) -> None:
+def check_known(wanted: list[Hashable], available: Iterable[Hashable], arg: str) -> None:
+    """Raise ValueError naming the wanted values that are not available."""
     avail = list(available)
     missing = [w for w in wanted if w not in avail]
     if missing:
@@ -62,8 +64,9 @@ class Frames:
         """The first graph."""
         return next(iter(self.graphs.values()))
 
+    @cached_property
     def union(self) -> nx.Graph[Any]:
-        """Combine all periods into one graph with summed edge weights."""
+        """All periods combined into one graph with summed edge weights."""
         if not self.animated:
             return self.first
         first = self.first
@@ -83,6 +86,16 @@ class Frames:
                 else:
                     out.add_edge(u, v, weight=float(w))
         return out
+
+    def single(self, fn: str) -> nx.Graph[Any]:
+        """Return the only graph, or explain how to pick one period."""
+        if self.animated:
+            keys = list(self.graphs)
+            raise ValueError(
+                f"{fn} draws one period but the data has {len(keys)} "
+                f"({keys[0]} to {keys[-1]}); pass time=<one period>"
+            )
+        return self.first
 
 
 def to_frames(
@@ -123,7 +136,7 @@ def to_frames(
             raise ValueError("category= needs a flow table; filter the graphs yourself")
         keys = list(data)
         if times is not None:
-            _check_known(times, keys, "time")
+            check_known(times, keys, "time")
             keys = [k for k in keys if k in times]
         if not keys:
             raise ValueError("no graphs to plot")
@@ -150,7 +163,7 @@ def _frames_from_flows(
     if cats is not None:
         if "category" not in df.columns:
             raise ValueError("category= given but the flow table has no 'category' column")
-        _check_known(cats, sorted(df["category"].unique(), key=str), "category")
+        check_known(cats, sorted(df["category"].unique(), key=str), "category")
         df = df[df["category"].isin(cats)]
     if "category" in df.columns and df["category"].nunique() > 1:
         shown = ", ".join(map(str, sorted(df["category"].unique(), key=str)[:6]))
@@ -164,7 +177,7 @@ def _frames_from_flows(
     if times is not None:
         if "time" not in df.columns:
             raise ValueError("time= given but the flow table has no 'time' column")
-        _check_known(times, periods, "time")
+        check_known(times, periods, "time")
         periods = [p for p in periods if p in times]
     if not periods or df.empty:
         raise ValueError("no flows left to plot after filtering")
@@ -177,4 +190,31 @@ def _frames_from_flows(
     lab = flows.attrs.get("labels")
     return Frames(
         graphs, merge_labels(lab if isinstance(lab, Mapping) else None, labels), unit_of(first)
+    )
+
+
+def long_table(data: Any, labels: Mapping[str, str] | None) -> tuple[pd.DataFrame, dict[str, str]]:
+    """Return a flow table and merged display labels.
+
+    Accepts a flow table, or a mapping from period to graph (each graph
+    becomes the rows of its period, with the graph's ``category`` and
+    ``unit``).
+    """
+    if is_flow_table(data):
+        lab = data.attrs.get("labels")
+        return data, merge_labels(lab if isinstance(lab, Mapping) else None, labels)
+    if isinstance(data, Mapping):
+        rows = []
+        first_labels: Mapping[str, str] | None = None
+        for k, g in data.items():
+            first_labels = first_labels or graph_labels(g)
+            cat, unit = g.graph.get("category", ""), unit_of(g)
+            rows += [
+                (u, v, k, cat, float(w), unit) for u, v, w in g.edges(data="weight", default=1.0)
+            ]
+        df = pd.DataFrame(rows, columns=["source", "target", "time", "category", "weight", "unit"])
+        return df, merge_labels(first_labels, labels)
+    raise TypeError(
+        "expected a flow table with source/target columns or a mapping from period to graph, "
+        f"not {type(data).__name__}"
     )

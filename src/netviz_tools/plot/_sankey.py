@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
-from typing import Any
 
-import networkx as nx
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -20,18 +18,6 @@ __all__ = ["sankey"]
 def plural(word: str) -> str:
     """Return a naive English plural for column headings."""
     return word if word.endswith("s") else word + "s"
-
-
-def single_period(frames: Any, fn: str) -> nx.Graph[Any]:
-    """Return the only graph, or explain how to pick one period."""
-    if frames.animated:
-        keys = list(frames.graphs)
-        raise ValueError(
-            f"{fn} draws one period but the data has {len(keys)} ({keys[0]} to {keys[-1]}); "
-            "pass time=<one period>"
-        )
-    g: nx.Graph[Any] = frames.first
-    return g
 
 
 def sankey(
@@ -83,7 +69,7 @@ def sankey(
         ``color_by`` is numeric.
     """
     frames = to_frames(data, time=time, category=category, labels=labels, node_attrs=node_attrs)
-    g = single_period(frames, "sankey")
+    g = frames.single("sankey")
     if not g.is_directed():
         raise ValueError("sankey needs a directed graph")
     lab = frames.labels
@@ -104,7 +90,7 @@ def sankey(
         src=frame["src"].where(frame["src"].isin(sources), other_src),
         dst=frame["dst"].where(frame["dst"].isin(targets), other_dst),
     )
-    links = grouped.groupby(["src", "dst"], sort=False)["w"].sum()
+    links = grouped.groupby(["src", "dst"], sort=False, as_index=False)["w"].sum()
 
     left: list[Hashable] = [*sources, *([other_src] if len(out_s) > top_n else [])]
     right: list[Hashable] = [*targets, *([other_dst] if len(in_s) > top_n else [])]
@@ -118,7 +104,7 @@ def sankey(
         if not resolved.categorical:
             raise ValueError("sankey colours need a categorical color_by (text or community)")
         real = list(dict.fromkeys([*sources, *targets]))
-        cats = categories(resolved.values.reindex(real), name=resolved.name)
+        cats = categories(resolved.series.reindex(real), name=resolved.name)
         colors = {n: cats.colors[str(cats.labels[n])] for n in real}
         legend = cats.colors
 
@@ -126,6 +112,7 @@ def sankey(
         return colors.get(n, OTHER_COLOR if resolved is not None else "#2a78d6")
 
     unit = frames.unit
+    src, dst, values = links["src"].tolist(), links["dst"].tolist(), links["w"].tolist()
     fig = go.Figure(
         go.Sankey(
             arrangement="snap",
@@ -142,13 +129,14 @@ def sankey(
                 + [(i + 0.5) / len(right) for i in range(len(right))],
             },
             link={
-                "source": [left_idx[s] for s, _ in links.index],
-                "target": [right_idx[d] for _, d in links.index],
-                "value": links.to_numpy().tolist(),
-                "color": [rgba(node_color(s), 0.35) for s, _ in links.index],
+                "source": [left_idx[s] for s in src],
+                "target": [right_idx[d] for d in dst],
+                "value": values,
+                "color": [rgba(node_color(s), 0.35) for s in src],
                 "customdata": [
-                    f"{lab['source']}: {s}<br>{lab['target']}: {d}<br>{lab['weight']}: {fmt(w, unit)}"
-                    for (s, d), w in links.items()
+                    f"{lab['source']}: {s}<br>{lab['target']}: {d}<br>"
+                    f"{lab['weight']}: {fmt(w, unit)}"
+                    for s, d, w in zip(src, dst, values, strict=True)
                 ],
                 "hovertemplate": "%{customdata}<extra></extra>",
             },
@@ -179,7 +167,8 @@ def sankey(
         },
     ]
     layout["margin"] = {"l": 10, "r": 10, "t": 80, "b": 10}
-    fig.update_layout(**layout, font={"size": 11})
+    layout["font"] = {**layout["font"], "size": 11}
+    fig.update_layout(**layout)
     if legend:
         for name, color in legend.items():
             fig.add_trace(
