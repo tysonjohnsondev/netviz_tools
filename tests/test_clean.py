@@ -745,14 +745,15 @@ def test_clean_raw_sample_drops_self_loops_like_load_sample() -> None:
 
 def test_display_labels_come_from_raw_columns() -> None:
     raw = pd.DataFrame({"origin_country": ["A", "B"], "Destination": ["B", "C"], "persons": [5, 7]})
-    flows, _ = clean(raw, fill={"time": 2020, "category": "migrants", "unit": "persons"})
+    fill = {"time": 2020, "category": "migrants", "unit": "persons"}
+    flows, _ = clean(raw, source="origin_country", weight="persons", fill=fill)
     assert flows.attrs["labels"] == {
         "source": "Origin country",
         "target": "Destination",
         "weight": "Persons",
     }
     flows2, _ = clean(
-        raw, fill={"time": 2020, "category": "m", "unit": "p"}, labels={"weight": "People"}
+        raw, source="origin_country", weight="persons", fill=fill, labels={"weight": "People"}
     )
     assert flows2.attrs["labels"]["weight"] == "People"
 
