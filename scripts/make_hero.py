@@ -34,10 +34,10 @@ def main() -> None:
         node_attrs=countries,
         color_by="continent",
         size_by="out_strength",
-        top_n=45,
-        show_labels=10,
-        min_weight_quantile=0.6,
-        title="Wheat trade network, 2022: the 45 largest exporters",
+        top_n=30,
+        show_labels=8,
+        min_weight_quantile=0.8,
+        title="Wheat trade network, 2022: the 30 largest exporters",
     )
     geo = nv.plot.flow_map(
         flows,
@@ -54,9 +54,10 @@ def main() -> None:
             width=WIDTH,
             height=HEIGHT,
             showlegend=fig is geo,
+            margin={"l": 10, "r": 10, "t": 60, "b": 70},
             legend={
                 "orientation": "h",
-                "y": -0.02,
+                "y": -0.07,
                 "x": 0.5,
                 "xanchor": "center",
                 "title": {"text": ""},

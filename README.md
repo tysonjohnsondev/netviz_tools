@@ -18,7 +18,7 @@ rendering backend (Plotly). FAOSTAT agricultural trade data ships as the worked
 example of messy input, but the steps work for migration, shipping, payments,
 citations, or any NetworkX graph you already have.
 
-![Soya bean trade, 2024: the 60 largest flows](https://raw.githubusercontent.com/tysonjohnsondev/netviz_tools/main/docs/assets/hero.png)
+![Two views of the bundled FAOSTAT sample after cleaning: the 2022 wheat trade network coloured by continent, and the 60 largest soya bean flows of 2024 on a world map](https://raw.githubusercontent.com/tysonjohnsondev/netviz_tools/main/docs/assets/hero.png)
 
 ## Install
 
