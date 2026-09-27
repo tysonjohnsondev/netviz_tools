@@ -124,7 +124,7 @@ nv.plot.compare(flows, "Brazil", time=2024)
 ```
 
 In 2024 Brazil exported 99.8 million tonnes of soya beans and 43.1 million
-tonnes of maize, and imported 6.7 million tonnes of wheat while exporting
+tonnes of maize, and imported 6.6 million tonnes of wheat while exporting
 2.9 million.
 
 **How did flows change over time?** Pass several years and the map becomes an
