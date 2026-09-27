@@ -29,20 +29,32 @@ MODULES = (
     "netviz_tools.temporal",
     "netviz_tools.stats",
     "netviz_tools.errors",
-    "netviz_tools.plot.network",
-    "netviz_tools.plot.sankey",
-    "netviz_tools.plot.geo",
-    "netviz_tools.plot.charts",
-    "netviz_tools.plot._style",
+    "netviz_tools.plot",
     "netviz_tools.datasets.faostat",
 )
+
+
+def _public_path(module: str, name: str) -> str:
+    """Return the documented path of an object defined in a private module.
+
+    ``netviz_tools.plot._network.network`` is documented as
+    ``netviz_tools.plot.network``: walk up the package until a parent
+    re-exports the name.
+    """
+    parts = module.split(".")
+    while any(p.startswith("_") for p in parts) and len(parts) > 1:
+        parts = parts[:-1]
+        parent = importlib.import_module(".".join(parts))
+        if name in getattr(parent, "__all__", ()):
+            return f"{'.'.join(parts)}.{name}"
+    return f"{module}.{name}"
 
 
 def _canonical(obj: Any, fallback: str) -> str:
     if inspect.ismodule(obj):
         return obj.__name__
     if inspect.isclass(obj) or inspect.isfunction(obj):
-        return f"{obj.__module__}.{obj.__qualname__}"
+        return _public_path(obj.__module__, obj.__qualname__)
     return fallback
 
 

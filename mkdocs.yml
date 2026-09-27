@@ -1,5 +1,5 @@
 site_name: netviz-tools
-site_description: Typed tools for building, measuring and plotting bilateral flow networks, with FAOSTAT agricultural trade as the flagship dataset.
+site_description: From a messy edge table to interactive network charts. Clean, build a NetworkX graph, and plot with Plotly using one set of arguments.
 site_author: Tyson Johnson
 site_url: https://tysonjohnsondev.github.io/netviz_tools/
 repo_url: https://github.com/tysonjohnsondev/netviz_tools
@@ -48,8 +48,11 @@ theme:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Concepts: concepts.md
   - Gallery:
       - gallery/index.md
+      - Any NetworkX graph: gallery/any-networkx-graph.ipynb
+      - From raw FAOSTAT to charts: gallery/faostat-pipeline.ipynb
       - The 2022 wheat shock: gallery/wheat-2022-shock.ipynb
       - Community structure: gallery/community-structure.ipynb
       - Power law vs lognormal: gallery/power-law-vs-lognormal.ipynb
@@ -58,6 +61,7 @@ nav:
       - api/index.md
       - netviz_tools: api/package.md
       - graph: api/graph.md
+      - clean: api/clean.md
       - analysis: api/analysis.md
       - metrics: api/metrics.md
       - temporal: api/temporal.md

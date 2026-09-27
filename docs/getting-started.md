@@ -1,6 +1,6 @@
 # Getting started
 
-This page walks through the library from a flow table to a figure. FAOSTAT trade data is the worked example, and every example runs offline on the bundled sample; the same steps apply to migration or any other flow data (see [Bringing your own data](#bringing-your-own-data)).
+This page walks through the pipeline: a raw table, cleaned into a flow table, built into NetworkX graphs, and drawn as Plotly figures. FAOSTAT trade data is the worked example, and every example runs offline on the bundled sample; the same steps apply to migration or any other flow data (see [Bringing your own data](#bringing-your-own-data)). If you already have a NetworkX graph, skip to [Plots](#plots).
 
 ```python
 import netviz_tools as nv
@@ -52,6 +52,62 @@ Display names travel with the data. Every FAOSTAT frame carries `faostat.LABELS`
 For your own data, set `df.attrs["labels"]` to a dict with any of these keys (for example `{"source": "Origin", "target": "Destination"}`).
 
 Items can be given by FAOSTAT name (case-insensitive), by item code (`15` is wheat), or by the snake_case slug used in netviz_tools 0.x. A misspelt name raises `UnknownItemError` with suggestions: `unknown item 'wheet'. Did you mean: 'Wheat', 'Sheep'?`. `faostat.items("soya")` searches the catalogue of 558 traded items.
+
+## Cleaning a raw table
+
+`nv.clean` turns a messy table into a flow frame and returns a `CleaningReport`. The FAOSTAT bulk file is a good example of messy input: each row is one country's report, so every flow can appear twice (once as the exporter's "Export quantity", once as the importer's "Import quantity"), usually with different numbers. `faostat.raw_sample()` gives the bundled sample in that layout:
+
+```python
+>>> raw = faostat.raw_sample(items="Wheat")
+>>> raw[["Reporter Countries", "Partner Countries", "Element", "Year", "Value", "Unit"]].head(2)
+>>> flows, report = nv.clean(raw)
+>>> print(report.summary())
+Cleaned 44,738 raw rows into 29,627 flows.
+Columns: 'Reporter Countries' -> reporter (guessed), 'Partner Countries' -> partner (guessed),
+'Element' -> direction (guessed), 'Year' -> time (guessed), 'Item' -> category (guessed),
+'Value' -> weight (guessed), 'Unit' -> unit (guessed)
+...
+- self-loops: 44,738 -> 44,722 rows
+- mirror flows: 44,722 -> 29,627 rows (dropped 15,095 exporter reports of flows both sides reported)
+Mirror flows: 15,095 reported by both sides, 6,994 by the source only, 7,538 by the target only;
+median disagreement 23.9%; used the target's report where both exist.
+```
+
+The two reports of the same flow differ by 23.9% in the median case, which is why the choice matters. `prefer="target"` (the default) keeps the importer's report where there is one, the same rule as `faostat.load(..., reporter="combined")`; `"source"`, `"mean"` and `"max"` are the alternatives.
+
+What `clean` does, in order, and what it records:
+
+| Step | What happens |
+| --- | --- |
+| columns | each role (`source`, `target`, `time`, `category`, `weight`, `unit`, or `reporter`, `partner`, `direction`) is taken from the column you name, or guessed from the headers; ambiguous or missing columns raise `SchemaError` with the columns found |
+| duplicates | rows identical in every raw column are dropped |
+| missing values | rows without a source, target or unit are dropped |
+| direction | reporter tables become source-to-target flows (`"Export ..."` rows keep the reporter as source, `"Import ..."` rows reverse it) |
+| weight, time | text such as `"1,234.5"` becomes a number; unparseable, missing, infinite and negative weights are dropped; `"2021"` or `2021.0` becomes `2021` |
+| units | `unit_conversions={"1000 An": ("head", 1000.0)}` rescales and renames |
+| names | whitespace is normalized, `aliases={"Turkey": "Türkiye"}` applied, and spellings that differ only in case, accents or punctuation are merged; near matches (typos) are listed in `report.possible_aliases` but never merged |
+| drop nodes | `drop_nodes=["World"]` removes aggregates |
+| zeros, self-loops | dropped unless `zeros="keep"` or `self_loops=True` |
+| repeated flows | rows with the same source, target, time, category and unit are summed (`duplicates="keep"` keeps them) |
+| mirror flows | one report per flow, chosen by `prefer` |
+
+Every removed row is in `report.dropped`, with the original columns and a `reason`. `report.to_frame()` gives the steps as a table, and `report.renamed` every spelling change. The output also carries display labels in `flows.attrs["labels"]`, taken from the raw column names (or Exporter and Importer for reporter tables), so the charts use your words.
+
+For your own data, name the columns with the vocabulary words and fill in what the table lacks:
+
+```python
+flows, report = nv.clean(
+    raw,
+    source="origin",
+    target="destination",
+    weight="persons",
+    fill={"time": 2020, "category": "migrants", "unit": "persons"},
+    aliases={"Czech Rep.": "Czechia"},
+    drop_nodes=["Total"],
+)
+```
+
+`faostat.load()` and `faostat.load_sample()` return data that are already clean (the same steps run in DuckDB), so FAOSTAT users can skip this step.
 
 ## Building graphs
 
@@ -198,28 +254,57 @@ Positive `R` favours the power law; the p-value says whether the sign of `R` can
 
 ## Plots
 
-Every plotting function returns a `plotly.graph_objects.Figure` and never calls `show()`. You decide whether to show it, change it, or save it:
+Every plotting function takes the data first (a NetworkX graph, a flow table, or a mapping from period to graph) and returns a `plotly.graph_objects.Figure` without showing or saving it. They share one set of argument names; [Concepts](concepts.md) has the full table.
 
 ```python
-fig = nv.plot.network(g, top_n=40, color_by="continent")
+g = nv.build_graph(flows, time=2022, node_attrs=faostat.countries())
+fig = nv.plot.network(g, top_n=40, color_by="continent", size_by="out_strength")
 fig.update_layout(height=500)
 fig.write_html("wheat-2022.html")
 ```
 
 | Function | What it draws |
 | --- | --- |
-| `nv.plot.network(g, ...)` | node-link diagram; `layout="spring"`, `"kamada_kawai"`, `"circular"` or `"community"`; colour by a node attribute or by community |
-| `nv.plot.sankey(g, top_n=10)` | flows from the largest exporters (left) to the largest importers (right), with the rest grouped as "Other" |
-| `nv.plot.flow_map(g, top_n=60)` | the largest flows as arcs on a world map, placed at the bundled country label points |
-| `nv.plot.time_series(df, columns, facet=...)` | one line per column of a period-indexed table, such as `metric_series` output |
-| `nv.plot.degree_distribution(fit)` | empirical CCDF with the fitted power-law, lognormal and exponential tails on log-log axes |
-| `nv.plot.community_layout(g, partition)` | node positions with each community in its own cluster (used by `layout="community"`) |
+| `nv.plot.network(data, ...)` | node-link diagram of any graph; layouts `"spring"`, `"kamada_kawai"`, `"circular"`, `"shell"`, `"spectral"`, `"community"`, `"bipartite"`, `"multipartite"`, `"geo"`; arrows on directed edges |
+| `nv.plot.ego(data, node, radius=1)` | a node and its neighbours, drawn like `network` with the centre emphasised |
+| `nv.plot.flow_map(data, top_n=60)` | the largest flows as lines on a world map; `focus=` follows one country |
+| `nv.plot.sankey(data, top_n=10)` | flows from the largest sources (left) to the largest targets (right), the rest grouped as "Other" |
+| `nv.plot.adjacency(data, sort_by="community")` | the weighted adjacency matrix, with communities as blocks on the diagonal |
+| `nv.plot.ranking(data, size_by=..., change=False)` | top nodes by a value, with the previous period marked; `change=True` ranks by the change |
+| `nv.plot.compare(flows, node, role="both")` | one node's outgoing and incoming totals per category |
+| `nv.plot.time_series(data, focus=..., category=...)` | totals per period, or one node's flows per period, with the change from the previous period in the hover text |
+| `nv.plot.degree_distribution(fit)` | empirical CCDF with the fitted power-law, lognormal and exponential tails |
+| `nv.plot.auto(data, kind="auto")` | any of the above by name, or a chart chosen from the data |
 
-Node sizes and edge widths are log-scaled so that a few very large flows do not hide the rest. Colours come from a fixed eight-colour palette; further categories are grouped as "Other", and legend entries carry the category name so that identity does not depend on colour alone. `flow_map` needs no extra dependencies: it uses Plotly's built-in geography and the coordinates in `faostat.countries()`. Pass `coords=` (a table with `lon` and `lat`) for nodes that are not FAOSTAT countries.
+### Colour, size and labels
+
+`color_by` and `size_by` take a node attribute (`"continent"`), a metric (`"degree"`, `"strength"`, `"out_strength"`, `"pagerank"`, `"betweenness"`, `"community"`, ...), a mapping or Series of your own values, `"auto"`, or `None`. Text values get a legend with up to eight colours (the rest are "Other"); numbers get a colour bar. Sizes and colours are log-scaled when values span more than two orders of magnitude. `edge_width_by` and `edge_color_by` do the same for edges, and `edge_color_by="source"` colours each flow like its exporter. `show_labels` decides which nodes get a text label and `label_by` which attribute supplies the text. `focus="Ukraine"` outlines a node, labels it, darkens its edges and fades the rest.
+
+### Time
+
+A flow table spanning several years draws every year. Network diagrams and flow maps become animations with a play button and a year slider, with node positions and scales fixed so that movement means change:
+
+```python
+all_years = nv.clean(faostat.raw_sample(items="Soya beans"))[0]
+nv.plot.flow_map(all_years, top_n=40)  # 2010 to 2024, one frame per year
+nv.plot.flow_map(all_years, time=range(2019, 2025), focus="Brazil")  # Brazil's flows only
+```
+
+Bar charts compare the last period with the one before:
+
+```python
+wheat = nv.clean(faostat.raw_sample(items="Wheat"))[0]
+nv.plot.ranking(wheat, time=[2022, 2023], size_by="out_strength", change=True)
+nv.plot.time_series(wheat, focus="Ukraine")  # Ukraine's wheat exports and imports per year
+```
+
+### Choosing a chart automatically
+
+`nv.plot.auto(g)` picks a chart from the data: a flow map when every node has coordinates, a Sankey when every node only sends or only receives, an ego view or a comparison when you pass one `focus` node, a network otherwise. The rules are listed on the [Concepts](concepts.md#plotauto-name-the-chart-or-let-it-choose) page. The figure records what was chosen and why, in `fig.layout.meta["netviz"]` and under the title.
 
 ## Bringing your own data
 
-`nv.to_flowframe` converts any edge list into a flow frame. Map your column names to schema names, and give constants for the columns you do not have. Migration between regions, for example:
+For tables that need cleaning, use `nv.clean` as shown [above](#cleaning-a-raw-table). For a table that is already tidy, `nv.to_flowframe` is the lighter option: map your column names to schema names, and give constants for the columns you do not have. Migration between regions, for example:
 
 ```python
 import pandas as pd

@@ -1,14 +1,14 @@
 [project]
 name = "netviz-tools"
 version = "1.0.0"
-description = "Typed, tested tools for building, measuring, and plotting bilateral flow networks, with FAOSTAT trade data as the flagship dataset."
+description = "From a messy edge table to interactive network charts: clean, build a NetworkX graph, and plot with Plotly using one set of arguments. FAOSTAT trade data included as a worked example."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Tyson Johnson", email = "tysonjohnsondev@gmail.com" }]
 maintainers = [{ name = "Tyson Johnson", email = "tysonjohnsondev@gmail.com" }]
 requires-python = ">=3.11"
-keywords = ["network analysis", "trade networks", "flow networks", "FAOSTAT", "networkx", "plotly", "duckdb"]
+keywords = ["network visualization", "networkx", "plotly", "graph visualization", "data cleaning", "flow networks", "trade networks", "FAOSTAT"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",

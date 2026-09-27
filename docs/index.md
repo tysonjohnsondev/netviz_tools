@@ -1,19 +1,34 @@
 # netviz-tools
 
-netviz-tools is a small, typed Python library for flow networks: who sends how much of what to whom, and when. It is a pipeline from a messy flow table to a clean flow frame, then to NetworkX graphs, metrics and Plotly charts. Trade, migration or any other flow data fits the same schema.
+Network data rarely arrives in a shape NetworkX can use. Columns are named differently in every source, the same place is spelled three ways, trade statistics list each flow twice with different numbers, and units get mixed. Once the data is clean, there are still several plotting packages to choose from, each with its own input format and quirks.
 
-The worked example is the FAOSTAT Detailed Trade Matrix: bilateral trade in about 560 agricultural products between about 220 countries and territories since 1986. A sample with wheat, maize and soya beans for 2010 to 2024 ships inside the package, so every example on this site runs offline.
+netviz-tools standardizes the path from a raw edge table to an interactive chart:
 
-## Features
+1. **Clean.** `nv.clean(raw)` works out which column holds the source, target, weight, time and category, fixes spellings, resolves flows reported by both sides, drops what cannot be used, and returns a report of every change.
+2. **Build.** `nv.build_graph(flows, time=2022)` turns one slice into a NetworkX graph, and refuses to mix periods or categories by accident.
+3. **Plot.** `nv.plot.network`, `flow_map`, `sankey`, `adjacency`, `ranking`, `compare`, `time_series` and others take the same arguments and return Plotly figures. `nv.plot.auto` draws a chart by name or picks one from the data.
 
-- **One schema.** A flow frame is a pandas DataFrame with `source`, `target`, `time`, `category`, `weight` and `unit`. `nv.to_flowframe` converts any edge list (trade, migration, shipping, payments) into it, and `nv.validate_flows` checks it. Domain display names ride along in `flows.attrs["labels"]`; the FAOSTAT loaders set them to Exporter, Importer, Year, Item and so on.
-- **Graphs that know their slice.** `nv.build_graph` builds one graph per `time` and `category` (select one with `time=` and `category=`), and raises `MixedSliceError` instead of silently adding up different periods or commodities. Aggregation is explicit: `aggregate="sum"` or `aggregate="mean"`. `nv.graphs_by` builds one graph per group.
-- **Metrics.** Strength, degree, PageRank, reverse PageRank and weighted betweenness in one call (`nv.metrics.centrality`); Louvain and greedy-modularity communities with fixed seeds; modularity; community graphs.
-- **Time series.** `nv.temporal.metric_series` tracks graph-level metrics such as total volume and supplier concentration (Herfindahl-Hirschman index) across periods; `centrality_series` tracks one measure per node.
-- **Heavy-tail tests.** `nv.stats.degree_distribution_fit` fits a power-law tail by maximum likelihood following Clauset, Shalizi and Newman (2009), and compares it with lognormal and exponential tails using Vuong's likelihood-ratio test.
-- **Plots that return figures.** Network diagrams, Sankey diagrams, flow maps on a world map, time series and degree-distribution plots. Every function returns a `plotly.graph_objects.Figure` and never calls `show()`.
-- **Reproducible data.** `nv.datasets.faostat.build_store()` downloads the FAOSTAT bulk file once, checks it against a pinned SHA-256, converts it into a Parquet store partitioned by item, and writes a manifest with the source URL, hash, retrieval time and row counts. `load()` then reads only the partitions for the items you ask for.
-- **Typed errors.** Every exception derives from `nv.NetvizError` and from the matching built-in type. Unknown items and node names come with suggestions (`unknown node 'Russia'. Did you mean: 'Russian Federation', ...`).
+Any NetworkX graph can go straight to step 3. FAOSTAT agricultural trade data ships with the package as the worked example of messy input: a sample of wheat, maize and soya bean trade from 2010 to 2024, so every example on this site runs offline.
+
+## Quickstart
+
+```python
+import netviz_tools as nv
+
+raw = nv.datasets.faostat.raw_sample(items="Wheat")  # FAOSTAT rows as published
+flows, report = nv.clean(raw)  # 44,738 raw rows -> 29,627 flows
+g = nv.build_graph(flows, time=2022)  # 186 countries, 2,143 flows
+fig = nv.plot.auto(g)  # a flow map, because every node has coordinates
+fig.show()
+```
+
+With a graph you already have:
+
+```python
+import networkx as nx
+
+nv.plot.network(nx.karate_club_graph(), color_by="club", size_by="betweenness").show()
+```
 
 ## Install
 
@@ -23,28 +38,21 @@ pip install netviz-tools
 
 Python 3.11 or newer. The dependencies are pandas, NumPy, SciPy, NetworkX, Plotly, DuckDB, PyArrow and pooch.
 
-## Quickstart
+## What is in the box
 
-```python
-import netviz_tools as nv
-from netviz_tools.datasets import faostat
-
-flows = faostat.load_sample()  # wheat, maize and soya beans, 2010 to 2024, tonnes
-g = nv.build_graph(flows, time=2022, category="Wheat", node_attrs=faostat.countries())
-
-nv.metrics.centrality(g, ["out_strength", "pagerank"]).head()
-nv.partners(flows, "Ukraine", role="out", time=2022, category="Wheat", top_n=5)
-
-fig = nv.plot.network(g, top_n=40)  # coloured by continent
-fig.show()
-```
-
-The 2022 wheat graph has 166 countries and 1,646 flows. Australia is the largest exporter that year in the importer-reported data (25.0 million tonnes), followed by the Russian Federation (22.4 million tonnes).
+- **One vocabulary.** A clean flow table has the columns `source`, `target`, `time`, `category`, `weight` and `unit`; for trade data, source = exporter. The same words are the arguments of `clean`, `build_graph` and every plot. See [Concepts](concepts.md).
+- **Cleaning with a paper trail.** `nv.clean` guesses columns from headers (and says which it guessed), handles reporter/partner tables such as FAOSTAT and UN Comtrade, merges spelling variants, lists look-alike names without merging them, converts units, and keeps every dropped row with its reason.
+- **Charts for any graph.** Colour and size nodes by an attribute, a metric (`degree`, `strength`, `pagerank`, `betweenness`, `community`) or your own values; arrows on directed edges; hover text with every attribute; nine layouts including community clusters, bipartite columns and world maps.
+- **Time as a dimension.** Pass several periods and network diagrams and flow maps animate with a play button and a slider. Rankings and comparisons mark the previous period, and time series show period-on-period change.
+- **Analysis that feeds the charts.** Centrality, seeded communities, modularity, concentration over time, and power-law tail tests following Clauset, Shalizi and Newman (2009).
+- **Reproducible FAOSTAT data.** `nv.datasets.faostat.build_store()` downloads the full bulk file once, checks it against a pinned SHA-256, and converts it with DuckDB into a Parquet store with a manifest. `faostat.load()` then reads only the items you ask for.
+- **One backend, no side effects.** Every chart is a Plotly figure with a shared style, returned and never shown or saved for you. Nothing is downloaded, written or logged at import.
 
 ## Where to go next
 
-- [Getting started](getting-started.md): the schema, graphs, metrics, plots, your own data, and the full FAOSTAT store.
-- [Gallery](gallery/index.md): three executed notebooks on the 2022 wheat shock, community structure, and power-law tests.
+- [Getting started](getting-started.md): the pipeline step by step, on FAOSTAT data and on your own tables.
+- [Concepts](concepts.md): the shared argument names, the value forms for `color_by` and `size_by`, time animation, display labels, and the rules of `plot.auto`.
+- [Gallery](gallery/index.md): executed notebooks, starting with plain NetworkX graphs and the FAOSTAT pipeline from raw rows to charts.
 - [Data and licences](data.md): where the data come from, how they are transformed, and how to cite them.
 - [API reference](api/index.md): every public function, with signatures and docstrings.
 - [Changelog](changelog.md).
