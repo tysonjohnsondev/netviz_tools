@@ -114,8 +114,9 @@ nv.plot.ranking(flows, category="Wheat", time=[2022, 2023], size_by="out_strengt
 
 Argentina has the largest drop: its wheat exports went from 14.5 million
 tonnes in 2022 to 3.1 million tonnes in 2023, 11.4 million tonnes less, ahead
-of India (7.1 million less) and France (6.4 million less). The chart shows the
-numbers; why they changed is for you to find out.
+of India (7.1 million less) and France (6.4 million less); the top bar is the
+largest increase, the Russian Federation (11.5 million more). The chart shows
+the numbers; why they changed is for you to find out.
 
 **What does one country send and receive?** Compare one country across items:
 
